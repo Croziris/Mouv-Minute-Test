@@ -8,51 +8,65 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Mouv'Minute Design System */
+    --background: 43 23% 96%; /* #F4F5F0 - gris-beige très pâle */
+    --foreground: 0 0% 20%; /* #333333 - texte principal */
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 0 0% 20%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 0 0% 20%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Vert kaki clair comme couleur principale */
+    --primary: 85 20% 55%; /* #8DA47E - vert kaki clair */
+    --primary-foreground: 0 0% 98%;
+    --primary-light: 85 25% 70%; /* Version plus claire pour hover */
+    --primary-dark: 85 25% 45%; /* Version plus foncée */
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Orange doux comme accent */
+    --accent: 27 75% 55%; /* #E67E22 - orange doux */
+    --accent-foreground: 0 0% 98%;
+    --accent-light: 27 75% 65%; /* Version plus claire */
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --secondary: 43 23% 92%; /* Beige plus prononcé */
+    --secondary-foreground: 0 0% 20%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --muted: 43 15% 92%;
+    --muted-foreground: 0 0% 40%; /* #666666 - texte secondaire */
 
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 43 15% 85%;
+    --input: 43 15% 90%;
+    --ring: 85 20% 55%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem; /* 12px - boutons arrondis */
 
-    --sidebar-background: 0 0% 98%;
+    /* Gradients pour les effets visuels */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-light)));
+    --gradient-accent: linear-gradient(135deg, hsl(var(--accent)), hsl(var(--accent-light)));
+    --gradient-nature: linear-gradient(180deg, hsl(var(--background)), hsl(var(--secondary)));
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    /* Ombres élégantes */
+    --shadow-soft: 0 2px 10px -2px hsl(var(--primary) / 0.1);
+    --shadow-glow: 0 0 20px hsl(var(--primary) / 0.15);
+    --shadow-accent: 0 4px 15px -3px hsl(var(--accent) / 0.2);
 
-    --sidebar-primary: 240 5.9% 10%;
+    /* Animations fluides */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
+    /* Sidebar (non utilisée pour cette app mais gardée pour compatibilité) */
+    --sidebar-background: 43 23% 98%;
+    --sidebar-foreground: 0 0% 20%;
+    --sidebar-primary: 85 20% 55%;
     --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 43 15% 95%;
+    --sidebar-accent-foreground: 0 0% 20%;
+    --sidebar-border: 43 15% 85%;
+    --sidebar-ring: 85 20% 55%;
   }
 
   .dark {
