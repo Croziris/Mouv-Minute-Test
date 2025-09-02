@@ -69,7 +69,7 @@ export default function Home() {
             Bienvenue sur Mouv'Minute
           </h1>
           <p className="text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto">
-            Votre compagnon bien-être au travail. Prenez soin de votre corps avec des exercices simples 
+            Votre compagnon bien-être au travail conçu par un Kinésithérapeute. Prenez soin de votre corps avec des exercices simples 
             et des pauses régulières, directement intégrés à votre journée de bureau.
           </p>
         </div>
