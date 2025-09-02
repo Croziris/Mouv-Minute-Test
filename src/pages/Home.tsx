@@ -134,7 +134,7 @@ export default function Home() {
               </div>
               <h3 className="font-heading font-semibold text-primary mb-2">Ciblé efficace</h3>
               <p className="text-sm text-muted-foreground">
-                Exercices adaptés aux zones de tension
+                Exercices adaptés aux travail de bureau
               </p>
             </CardContent>
           </Card>
