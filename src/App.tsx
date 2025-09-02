@@ -14,6 +14,8 @@ import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
+import Session from "./pages/Session";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -26,6 +28,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/timer" element={<Timer />} />
+            <Route path="/session/:programId" element={<Session />} />
             <Route path="/exercises" element={<Exercises />} />
             <Route path="/exercises/:id" element={<ExerciseDetail />} />
             <Route path="/article/:id" element={<ArticleDetail />} />

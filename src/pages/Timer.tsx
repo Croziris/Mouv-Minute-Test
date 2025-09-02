@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Play, Pause, RotateCcw, CheckCircle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +28,7 @@ interface Program {
 
 export default function Timer() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [state, setState] = useState<TimerState>('stopped');
   const [timeLeft, setTimeLeft] = useState(45 * 60); // 45 minutes par défaut
   const [totalTime] = useState(45 * 60);
@@ -378,19 +380,27 @@ export default function Timer() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {programs.map((program) => (
-                    <Button
+                    <Card
                       key={program.id}
-                      variant="outline"
-                      onClick={() => launchProgram(program.id)}
-                      className="h-auto p-3 text-left flex flex-col items-start"
+                      className="cursor-pointer hover:shadow-soft transition-shadow border-muted hover:border-primary/50"
+                      onClick={() => navigate(`/session/${program.id}`)}
                     >
-                      <span className="font-medium text-sm">{program.title}</span>
-                      <span className="text-xs text-muted-foreground mt-1">
-                        {program.description}
-                      </span>
-                    </Button>
+                      <CardContent className="p-4">
+                        <h3 className="font-medium text-base mb-2 text-primary">
+                          {program.title}
+                        </h3>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          {program.description}
+                        </p>
+                        <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>3 exercices</span>
+                          <span>•</span>
+                          <span>~5 minutes</span>
+                        </div>
+                      </CardContent>
+                    </Card>
                   ))}
                 </div>
               </CardContent>

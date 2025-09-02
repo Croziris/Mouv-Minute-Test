@@ -100,7 +100,10 @@ export default function Auth() {
       <div className="w-full max-w-md space-y-6">
         {/* Logo/Titre */}
         <div className="text-center space-y-2">
-          <h1 className="text-3xl font-heading font-bold text-primary">
+          <h1 
+            className="text-3xl font-heading font-bold text-primary cursor-pointer hover:text-primary-dark transition-colors"
+            onClick={() => navigate('/')}
+          >
             Mouv'Minute
           </h1>
           <p className="text-muted-foreground">

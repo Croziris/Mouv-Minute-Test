@@ -13,6 +13,7 @@ interface Exercise {
   zone: string;
   duration_sec: number;
   description_public: string;
+  notes_kine: string | null;
   thumb_url: string | null;
   media_primary: string | null;
 }
@@ -167,12 +168,12 @@ export default function ExerciseDetail() {
             </CardContent>
           </Card>
 
-          {/* Description */}
+          {/* Description et conseils */}
           <div className="grid gap-6 md:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg font-heading">
-                  Description de l'exercice
+                <CardTitle className="text-lg font-heading flex items-center gap-2">
+                  📝 Description de l'exercice
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -182,7 +183,20 @@ export default function ExerciseDetail() {
               </CardContent>
             </Card>
 
-          {/* Private notes section removed - now in admin-only table */}
+            {exercise.notes_kine && (
+              <Card className="bg-secondary/30">
+                <CardHeader>
+                  <CardTitle className="text-lg font-heading flex items-center gap-2">
+                    💡 Tips kiné
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground leading-relaxed">
+                    {exercise.notes_kine}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Actions */}

@@ -13,6 +13,7 @@ interface Exercise {
   zone: string;
   duration_sec: number;
   description_public: string;
+  notes_kine: string | null;
   thumb_url: string | null;
   media_primary: string | null;
 }

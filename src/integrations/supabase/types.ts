@@ -83,6 +83,7 @@ export type Database = {
           duration_sec: number
           id: string
           media_primary: string | null
+          notes_kine: string | null
           thumb_url: string | null
           title: string
           updated_at: string
@@ -94,6 +95,7 @@ export type Database = {
           duration_sec?: number
           id?: string
           media_primary?: string | null
+          notes_kine?: string | null
           thumb_url?: string | null
           title: string
           updated_at?: string
@@ -105,6 +107,7 @@ export type Database = {
           duration_sec?: number
           id?: string
           media_primary?: string | null
+          notes_kine?: string | null
           thumb_url?: string | null
           title?: string
           updated_at?: string
