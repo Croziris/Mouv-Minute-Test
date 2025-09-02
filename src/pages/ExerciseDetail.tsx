@@ -20,10 +20,10 @@ interface Exercise {
 
 const zoneConfig = {
   nuque: { label: "Nuque", color: "bg-primary/10 text-primary" },
-  epaules: { label: "Épaules", color: "bg-accent/10 text-accent" },
-  dos: { label: "Dos", color: "bg-primary/15 text-primary" },
-  trapezes: { label: "Trapèzes", color: "bg-accent/15 text-accent" },
-  tronc: { label: "Tronc", color: "bg-primary/20 text-primary" },
+  bras: { label: "Bras", color: "bg-accent/10 text-accent" },
+  "bas du dos": { label: "Bas du dos", color: "bg-primary/15 text-primary" },
+  "haut du dos": { label: "Haut du dos", color: "bg-accent/15 text-accent" },
+  autre: { label: "Autre", color: "bg-primary/20 text-primary" },
   jambes: { label: "Jambes", color: "bg-accent/20 text-accent" },
 };
 
@@ -128,14 +128,15 @@ export default function ExerciseDetail() {
           {/* Vidéo ou placeholder */}
           <Card>
             <CardContent className="p-0">
-              <div className="relative aspect-video bg-gradient-nature rounded-lg overflow-hidden">
+              <div className="relative aspect-[9/16] max-h-[70vh] bg-gradient-nature rounded-lg overflow-hidden mx-auto">
                 {exercise.media_primary ? (
                   <video
                     src={exercise.media_primary}
                     autoPlay={videoPlaying}
                     loop
                     muted
-                    className="w-full h-full object-cover"
+                    playsInline
+                    className="w-full h-full object-contain"
                     onClick={() => setVideoPlaying(!videoPlaying)}
                   />
                 ) : (
