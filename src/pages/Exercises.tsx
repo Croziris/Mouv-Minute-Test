@@ -204,7 +204,7 @@ export default function Exercises() {
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground text-center">
               💡 <strong>Conseil :</strong> Réalisez ces exercices lentement et écoutez votre corps. 
-              En cas de douleur, arrêtez l'exercice et consultez un professionnel de santé.
+              En cas de douleur inhabituelle, arrêtez l'exercice et pensez à consulter un professionnel de santé.
             </p>
           </CardContent>
         </Card>
