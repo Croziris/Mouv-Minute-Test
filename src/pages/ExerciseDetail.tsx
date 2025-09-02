@@ -13,7 +13,6 @@ interface Exercise {
   zone: string;
   duration_sec: number;
   description_public: string;
-  notes_kine: string;
   thumb_url: string | null;
   media_primary: string | null;
 }
@@ -183,20 +182,7 @@ export default function ExerciseDetail() {
               </CardContent>
             </Card>
 
-            {exercise.notes_kine && (
-              <Card className="bg-secondary/30">
-                <CardHeader>
-                  <CardTitle className="text-lg font-heading flex items-center gap-2">
-                    💡 Conseils du kinésithérapeute
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground leading-relaxed">
-                    {exercise.notes_kine}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
+          {/* Private notes section removed - now in admin-only table */}
           </div>
 
           {/* Actions */}

@@ -124,7 +124,7 @@ export default function Profile() {
         .upsert({
           user_id: user.id,
           display_name: profile.display_name,
-          email: profile.email,
+          // Don't update email - it's protected by trigger
         });
 
       if (error) throw error;
@@ -301,9 +301,13 @@ export default function Profile() {
                     id="email"
                     type="email"
                     value={profile.email}
-                    onChange={(e) => setProfile(prev => ({ ...prev, email: e.target.value }))}
+                    disabled
                     placeholder="votre@email.com"
+                    className="opacity-60"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    L'email ne peut pas être modifié ici. Utilisez les paramètres de votre compte.
+                  </p>
                 </div>
               </div>
               

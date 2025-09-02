@@ -87,13 +87,12 @@ export default function Timer() {
     }
 
     try {
-      // Créer une nouvelle session
+      // Créer une nouvelle session (user_id is auto-set by trigger)
       const { data: session, error } = await supabase
         .from('sessions')
-        .insert({
-          user_id: user.id,
+        .insert([{
           duration_minutes: Math.floor(totalTime / 60),
-        })
+        } as any])
         .select()
         .single();
 
