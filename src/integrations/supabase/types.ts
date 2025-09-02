@@ -152,6 +152,7 @@ export type Database = {
           id: string
           order_index: number
           program_id: string
+          Program_title: string | null
         }
         Insert: {
           created_at?: string
@@ -159,6 +160,7 @@ export type Database = {
           id?: string
           order_index: number
           program_id: string
+          Program_title?: string | null
         }
         Update: {
           created_at?: string
@@ -166,6 +168,7 @@ export type Database = {
           id?: string
           order_index?: number
           program_id?: string
+          Program_title?: string | null
         }
         Relationships: [
           {
@@ -181,6 +184,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "programs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "program_exercises_Program_title_fkey"
+            columns: ["Program_title"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["title"]
           },
         ]
       }
