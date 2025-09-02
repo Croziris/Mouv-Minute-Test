@@ -22,13 +22,28 @@ export default function Home() {
   useEffect(() => {
     const fetchArticles = async () => {
       try {
-        const { data, error } = await supabase
+        // Récupérer d'abord les articles avec Organisation 1,2,3,4
+        let { data, error } = await supabase
           .from('articles')
-          .select('id, title, summary, content, created_at')
-          .order('created_at', { ascending: false })
+          .select('id, title, summary, content, created_at, "Organisation"')
+          .in('Organisation', [1, 2, 3, 4])
+          .order('"Organisation"', { ascending: true })
           .limit(4);
 
         if (error) throw error;
+
+        // Fallback si moins de 4 articles trouvés
+        if (!data || data.length < 4) {
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from('articles')
+            .select('id, title, summary, content, created_at, "Organisation"')
+            .order('"Organisation"', { ascending: true, nullsFirst: false })
+            .limit(4);
+
+          if (fallbackError) throw fallbackError;
+          data = fallbackData;
+        }
+
         setArticles(data || []);
       } catch (error) {
         console.error('Error fetching articles:', error);
