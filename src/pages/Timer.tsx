@@ -18,6 +18,13 @@ interface Exercise {
   zone: string;
 }
 
+interface Program {
+  id: string;
+  title: string;
+  description: string;
+  order_index: number;
+}
+
 export default function Timer() {
   const { user } = useAuth();
   const [state, setState] = useState<TimerState>('stopped');
@@ -26,6 +33,8 @@ export default function Timer() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [breakExercises, setBreakExercises] = useState<Exercise[]>([]);
   const [completedExercises, setCompletedExercises] = useState<string[]>([]);
+  const [programs, setPrograms] = useState<Program[]>([]);
+  const [selectedProgram, setSelectedProgram] = useState<string | null>(null);
 
   // Timer logic
   useEffect(() => {
@@ -204,12 +213,75 @@ export default function Timer() {
   const allExercisesCompleted = breakExercises.length > 0 && 
     breakExercises.every(exercise => completedExercises.includes(exercise.id));
 
+  // Charger les programmes
+  useEffect(() => {
+    const fetchPrograms = async () => {
+      const { data } = await supabase
+        .from('programs')
+        .select('*')
+        .order('order_index', { ascending: true });
+      
+      if (data) {
+        setPrograms(data);
+      }
+    };
+
+    fetchPrograms();
+  }, []);
+
   // Demander la permission pour les notifications
   useEffect(() => {
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
   }, []);
+
+  const launchProgram = async (programId: string) => {
+    try {
+      // Récupérer les exercices du programme
+      const { data: programExercises } = await supabase
+        .from('program_exercises')
+        .select(`
+          exercise_id,
+          order_index,
+          exercises (
+            id,
+            title,
+            description_public,
+            duration_sec,
+            zone
+          )
+        `)
+        .eq('program_id', programId)
+        .order('order_index', { ascending: true });
+
+      if (programExercises && programExercises.length > 0) {
+        const exercises = programExercises.map(pe => pe.exercises).filter(Boolean);
+        setBreakExercises(exercises);
+        setCompletedExercises([]);
+        setState('break');
+        
+        // Ajouter les exercices à la session si une session est active
+        if (sessionId) {
+          const sessionExercises = exercises.map(exercise => ({
+            session_id: sessionId,
+            exercise_id: exercise.id,
+          }));
+
+          await supabase
+            .from('session_exercises')
+            .insert(sessionExercises);
+        }
+      }
+    } catch (error) {
+      console.error('Error launching program:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de lancer le programme.",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <Layout>
@@ -294,6 +366,33 @@ export default function Timer() {
                       45 minutes de travail, puis 3 minutes d'exercices
                     </p>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Programmes de séances */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg font-heading">Programmes de séances</CardTitle>
+                <CardDescription>
+                  Séances prédéfinies de 3 exercices que vous pouvez lancer à tout moment
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-3">
+                  {programs.map((program) => (
+                    <Button
+                      key={program.id}
+                      variant="outline"
+                      onClick={() => launchProgram(program.id)}
+                      className="h-auto p-3 text-left flex flex-col items-start"
+                    >
+                      <span className="font-medium text-sm">{program.title}</span>
+                      <span className="text-xs text-muted-foreground mt-1">
+                        {program.description}
+                      </span>
+                    </Button>
+                  ))}
                 </div>
               </CardContent>
             </Card>

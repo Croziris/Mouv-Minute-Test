@@ -1,153 +1,201 @@
-import { ArrowRight, Clock, Heart, Target } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { ArrowRight, Heart, Clock, Target, Lightbulb } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
+import { Link } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 
-const tips = [
-  {
-    title: "L'importance des micro-pauses",
-    description: "Des pauses de 3 minutes toutes les 45-60 minutes réduisent les TMS de 40%.",
-    icon: Clock,
-  },
-  {
-    title: "Améliorer sa posture",
-    description: "Une bonne posture réduit les douleurs dorsales et améliore votre productivité.",
-    icon: Target,
-  },
-  {
-    title: "Circulation sanguine",
-    description: "Bouger régulièrement active la circulation et combat la sédentarité.",
-    icon: Heart,
-  },
-];
-
-const articles = [
-  {
-    title: "Pourquoi bouger au travail ?",
-    description: "Les risques de la sédentarité et les bienfaits des micro-pauses actives.",
-  },
-  {
-    title: "Prévention des TMS",
-    description: "Comment éviter les troubles musculo-squelettiques au bureau.",
-  },
-  {
-    title: "Optimiser votre poste de travail",
-    description: "Ergonomie et bonnes pratiques pour un bureau adapté.",
-  },
-  {
-    title: "Sommeil et récupération",
-    description: "L'importance du repos pour votre santé et votre performance.",
-  },
-  {
-    title: "Alimentation au bureau",
-    description: "Bien manger pendant sa journée de travail.",
-  },
-];
+interface Article {
+  id: string;
+  title: string;
+  summary: string;
+  content: string;
+  created_at: string;
+}
 
 export default function Home() {
-  const navigate = useNavigate();
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchArticles = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('articles')
+          .select('id, title, summary, content, created_at')
+          .order('created_at', { ascending: false })
+          .limit(4);
+
+        if (error) throw error;
+        setArticles(data || []);
+      } catch (error) {
+        console.error('Error fetching articles:', error);
+        toast({
+          title: "Erreur",
+          description: "Impossible de charger les articles.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchArticles();
+  }, []);
 
   return (
     <Layout>
       <div className="container mx-auto px-4 py-6 space-y-8">
-        {/* Section hero avec conseil du jour */}
-        <section className="text-center space-y-6">
-          <div className="space-y-2">
-            <h1 className="text-2xl font-heading font-bold text-foreground">
-              Bienvenue sur Mouv'Minute
-            </h1>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Prenez soin de votre santé au travail avec des micro-pauses actives 
-              et des exercices adaptés aux salariés de bureau.
-            </p>
-          </div>
+        {/* Hero Section */}
+        <div className="text-center space-y-4">
+          <h1 className="text-3xl font-heading font-bold text-primary mb-4">
+            Bienvenue sur Mouv'Minute
+          </h1>
+          <p className="text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto">
+            Votre compagnon bien-être au travail. Prenez soin de votre corps avec des exercices simples 
+            et des pauses régulières, directement intégrés à votre journée de bureau.
+          </p>
+        </div>
 
-          {/* Conseil du jour */}
-          <Card className="bg-gradient-primary border-0 text-primary-foreground shadow-glow max-w-lg mx-auto">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-heading">💡 Conseil du jour</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="font-medium">
-                Bougez 3 minutes toutes les 45-60 minutes pour réduire 
-                les tensions et améliorer votre bien-être.
+        {/* Conseil du jour */}
+        <Card className="bg-gradient-nature shadow-glow">
+          <CardHeader className="text-center pb-4">
+            <div className="mx-auto w-16 h-16 bg-accent/10 rounded-full flex items-center justify-center mb-3">
+              <Lightbulb className="h-8 w-8 text-accent" />
+            </div>
+            <CardTitle className="text-xl font-heading text-primary">
+              Conseil du jour
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-center">
+            <p className="text-lg font-medium text-primary-dark mb-4">
+              "Bougez 3 minutes toutes les 45-60 minutes"
+            </p>
+            <p className="text-muted-foreground leading-relaxed">
+              Des études montrent que prendre des pauses actives régulières améliore 
+              la concentration, réduit les tensions musculaires et booste la productivité.
+            </p>
+            <Link to="/exercises" className="inline-block mt-4">
+              <Button className="bg-accent hover:bg-accent-light text-accent-foreground">
+                Découvrir les exercices
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        {/* Statistiques rapides */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card className="text-center hover:shadow-soft transition-shadow">
+            <CardContent className="p-6">
+              <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Heart className="h-6 w-6 text-primary" />
+              </div>
+              <h3 className="font-heading font-semibold text-primary mb-2">Prévention TMS</h3>
+              <p className="text-sm text-muted-foreground">
+                Réduisez les risques de troubles musculosquelettiques
               </p>
             </CardContent>
           </Card>
 
-          <Button 
-            onClick={() => navigate("/exercises")}
-            className="bg-accent hover:bg-accent-light text-accent-foreground shadow-accent font-medium"
-            size="lg"
-          >
-            Découvrir les exercices
-            <ArrowRight className="ml-2 h-5 w-5" />
-          </Button>
-        </section>
+          <Card className="text-center hover:shadow-soft transition-shadow">
+            <CardContent className="p-6">
+              <div className="w-12 h-12 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Clock className="h-6 w-6 text-accent" />
+              </div>
+              <h3 className="font-heading font-semibold text-primary mb-2">Micro-pauses</h3>
+              <p className="text-sm text-muted-foreground">
+                Exercices de 30 secondes à 3 minutes
+              </p>
+            </CardContent>
+          </Card>
 
-        {/* Section informative */}
-        <section className="space-y-6">
-          <h2 className="text-xl font-heading font-semibold text-center">
-            Pourquoi bouger au travail ?
+          <Card className="text-center hover:shadow-soft transition-shadow">
+            <CardContent className="p-6">
+              <div className="w-12 h-12 bg-secondary/50 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Target className="h-6 w-6 text-secondary-foreground" />
+              </div>
+              <h3 className="font-heading font-semibold text-primary mb-2">Ciblé efficace</h3>
+              <p className="text-sm text-muted-foreground">
+                Exercices adaptés aux zones de tension
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Articles et conseils */}
+        <div className="space-y-6">
+          <h2 className="text-2xl font-heading font-bold text-primary text-center">
+            Nos conseils bien-être
           </h2>
           
-          <div className="grid gap-4 md:grid-cols-3">
-            {tips.map((tip, index) => {
-              const Icon = tip.icon;
-              return (
-                <Card key={index} className="text-center hover:shadow-soft transition-shadow duration-300">
-                  <CardHeader className="pb-3">
-                    <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                      <Icon className="h-6 w-6 text-primary" />
-                    </div>
-                    <CardTitle className="text-lg font-heading">{tip.title}</CardTitle>
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {[1, 2, 3, 4].map((i) => (
+                <Card key={i} className="animate-pulse">
+                  <CardHeader>
+                    <div className="h-6 bg-muted rounded w-3/4 mb-2"></div>
+                    <div className="h-4 bg-muted rounded w-full"></div>
                   </CardHeader>
                   <CardContent>
-                    <CardDescription className="text-sm leading-relaxed">
-                      {tip.description}
-                    </CardDescription>
+                    <div className="space-y-2 mb-4">
+                      <div className="h-4 bg-muted rounded"></div>
+                      <div className="h-4 bg-muted rounded"></div>
+                      <div className="h-4 bg-muted rounded w-2/3"></div>
+                    </div>
+                    <div className="h-10 bg-muted rounded w-32"></div>
                   </CardContent>
                 </Card>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* Articles de prévention */}
-        <section className="space-y-6">
-          <h2 className="text-xl font-heading font-semibold text-center">
-            Articles et conseils
-          </h2>
-          
-          <div className="space-y-3">
-            {articles.map((article, index) => (
-              <Card key={index} className="hover:shadow-soft transition-all duration-300 cursor-pointer hover:bg-secondary/50">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1 flex-1">
-                      <h3 className="font-heading font-medium text-foreground">
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {articles.map((article) => (
+                <Link key={article.id} to={`/article/${article.id}`}>
+                  <Card className="hover:shadow-soft transition-shadow cursor-pointer group h-full">
+                    <CardHeader>
+                      <CardTitle className="text-lg font-heading group-hover:text-primary transition-colors">
                         {article.title}
-                      </h3>
-                      <p className="text-sm text-muted-foreground">
-                        {article.description}
+                      </CardTitle>
+                      <CardDescription>
+                        {article.summary}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
+                        {article.content.substring(0, 150)}...
                       </p>
-                    </div>
-                    <ArrowRight className="h-4 w-4 text-muted-foreground ml-4 flex-shrink-0" />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </section>
+                      <Button variant="ghost" className="group-hover:text-primary">
+                        Lire l'article
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
 
-        {/* Disclaimer médical */}
-        <section className="text-center">
-          <p className="text-xs text-muted-foreground max-w-md mx-auto leading-relaxed">
-            ⚕️ Cette application propose des conseils de prévention générale. 
-            Elle ne remplace pas un avis médical personnalisé.
-          </p>
-        </section>
+        {/* Call to action final */}
+        <Card className="bg-primary/5 border-primary/20">
+          <CardContent className="p-8 text-center space-y-4">
+            <h3 className="text-xl font-heading font-bold text-primary">
+              Prêt à commencer votre première session ?
+            </h3>
+            <p className="text-muted-foreground">
+              Lancez un timer de 45 minutes et recevez des rappels pour vos pauses bien-être
+            </p>
+            <Link to="/timer">
+              <Button size="lg" className="bg-primary hover:bg-primary-dark text-primary-foreground">
+                Démarrer maintenant
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
       </div>
     </Layout>
   );

@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 
 export function Header() {
   const { user, signOut } = useAuth();
@@ -32,11 +32,13 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-14 items-center justify-between px-4">
-        {/* Logo / Titre */}
+        {/* Logo / Titre cliquable */}
         <div className="flex items-center space-x-2">
-          <h1 className="text-lg font-heading font-bold text-primary">
-            Mouv'Minute
-          </h1>
+          <Link to="/" className="hover:opacity-80 transition-opacity">
+            <h1 className="text-lg font-heading font-bold text-primary">
+              Mouv'Minute
+            </h1>
+          </Link>
         </div>
 
         {/* Profil utilisateur */}
