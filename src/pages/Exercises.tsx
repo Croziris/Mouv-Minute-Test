@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { Clock, Play } from "lucide-react";
+import { Clock, Play, Lock } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Layout } from "@/components/layout/Layout";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Exercise {
   id: string;
@@ -29,6 +30,7 @@ const zoneConfig = {
 
 export default function Exercises() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedZone, setSelectedZone] = useState<string | null>(null);

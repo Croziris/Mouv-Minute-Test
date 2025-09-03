@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Clock, Play, Pause } from "lucide-react";
+import { ArrowLeft, Clock, Play, Pause, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Layout } from "@/components/layout/Layout";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { Link } from "react-router-dom";
 
 interface Exercise {
   id: string;
@@ -30,6 +32,7 @@ const zoneConfig = {
 export default function ExerciseDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [exercise, setExercise] = useState<Exercise | null>(null);
   const [loading, setLoading] = useState(true);
   const [videoPlaying, setVideoPlaying] = useState(true);
@@ -146,15 +149,33 @@ export default function ExerciseDetail() {
                 }}
               >
                 {exercise.media_primary ? (
-                  <video
-                    src={exercise.media_primary}
-                    autoPlay={videoPlaying}
-                    loop
-                    muted
-                    playsInline
-                    className="w-full h-full object-contain"
-                    onClick={() => setVideoPlaying(!videoPlaying)}
-                  />
+                  user ? (
+                    <video
+                      src={exercise.media_primary}
+                      autoPlay={videoPlaying}
+                      loop
+                      muted
+                      playsInline
+                      controlsList="nodownload"
+                      onContextMenu={() => false}
+                      className="w-full h-full object-contain"
+                      onClick={() => setVideoPlaying(!videoPlaying)}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-black/10">
+                      <div className="text-center p-8">
+                        <Lock className="h-16 w-16 text-primary/60 mx-auto mb-4" />
+                        <p className="text-muted-foreground mb-4">
+                          Connectez-vous pour lire la vidéo
+                        </p>
+                        <Link to="/auth">
+                          <Button className="bg-primary hover:bg-primary-dark text-primary-foreground">
+                            Se connecter
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+                  )
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <div className="text-center">
@@ -166,7 +187,7 @@ export default function ExerciseDetail() {
                   </div>
                 )}
 
-                {exercise.media_primary && (
+                {exercise.media_primary && user && (
                   <div className="absolute bottom-4 right-4">
                     <Button
                       size="sm"

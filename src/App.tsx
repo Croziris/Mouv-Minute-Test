@@ -13,6 +13,7 @@ import ArticleDetail from "./pages/ArticleDetail";
 import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import ArchivesConseils from "./pages/ArchivesConseils";
 
 import Session from "./pages/Session";
 
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="/exercises" element={<Exercises />} />
             <Route path="/exercises/:id" element={<ExerciseDetail />} />
             <Route path="/article/:id" element={<ArticleDetail />} />
+            <Route path="/archives-conseils" element={<ArchivesConseils />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/auth" element={<Auth />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

@@ -15,12 +15,56 @@ interface Article {
   created_at: string;
 }
 
+interface DailyTip {
+  id: string;
+  title: string;
+  content: string;
+}
+
 export default function Home() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dailyTip, setDailyTip] = useState<DailyTip | null>(null);
 
   useEffect(() => {
-    const fetchArticles = async () => {
+    const fetchData = async () => {
+      // Fetch daily tip
+      try {
+        let { data: tipData, error: tipError } = await supabase
+          .from('daily_tips')
+          .select('id, title, content')
+          .eq('organisation', 0)
+          .order('updated_at', { ascending: false })
+          .limit(1);
+
+        if (tipError) throw tipError;
+
+        // Fallback if no tip with organisation = 0
+        if (!tipData || tipData.length === 0) {
+          const { data: fallbackTip, error: fallbackError } = await supabase
+            .from('daily_tips')
+            .select('id, title, content')
+            .order('updated_at', { ascending: false })
+            .limit(1);
+
+          if (fallbackError) throw fallbackError;
+          tipData = fallbackTip;
+        }
+
+        if (tipData && tipData.length > 0) {
+          setDailyTip(tipData[0]);
+        }
+      } catch (error) {
+        console.error('Error fetching daily tip:', error);
+        // Set fallback tip if database fails
+        setDailyTip({
+          id: 'fallback',
+          title: 'Bougez 3 minutes toutes les 45-60 minutes',
+          content: 'Des études montrent que prendre des pauses actives régulières améliore la concentration, réduit les tensions musculaires et booste la productivité.'
+        });
+      }
+
+      // Fetch articles
       try {
         // Récupérer d'abord les articles avec Organisation 1,2,3,4
         let { data, error } = await supabase
@@ -57,7 +101,7 @@ export default function Home() {
       }
     };
 
-    fetchArticles();
+    fetchData();
   }, []);
 
   return (
@@ -86,11 +130,10 @@ export default function Home() {
           </CardHeader>
           <CardContent className="text-center">
             <p className="text-lg font-medium text-primary-dark mb-4">
-              "Bougez 3 minutes toutes les 45-60 minutes"
+              "{dailyTip?.title || 'Bougez 3 minutes toutes les 45-60 minutes'}"
             </p>
             <p className="text-muted-foreground leading-relaxed">
-              Des études montrent que prendre des pauses actives régulières améliore 
-              la concentration, réduit les tensions musculaires et booste la productivité.
+              {dailyTip?.content || 'Des études montrent que prendre des pauses actives régulières améliore la concentration, réduit les tensions musculaires et booste la productivité.'}
             </p>
             <Link to="/exercises" className="inline-block mt-4">
               <Button className="bg-accent hover:bg-accent-light text-accent-foreground">
@@ -192,6 +235,16 @@ export default function Home() {
               ))}
             </div>
           )}
+
+          {/* Button to archives */}
+          <div className="text-center mt-6">
+            <Link to="/archives-conseils">
+              <Button variant="outline" size="lg">
+                Voir toutes les archives de conseils bien-être
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Call to action final */}

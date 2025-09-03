@@ -47,6 +47,33 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_tips: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          organisation: number | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          organisation?: number | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          organisation?: number | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       exercise_private_notes: {
         Row: {
           created_at: string
