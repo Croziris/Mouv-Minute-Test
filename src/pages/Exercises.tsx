@@ -147,7 +147,15 @@ export default function Exercises() {
                     >
                       <CardHeader className="pb-3">
                         {/* Placeholder pour la miniature */}
-                        <div className="relative h-32 bg-gradient-nature rounded-lg mb-3 flex items-center justify-center">
+                        <div 
+                          className="relative h-32 rounded-lg mb-3 flex items-center justify-center"
+                          style={{
+                            backgroundImage: 'url(https://vblqvkqkmdmlcxxphwks.supabase.co/storage/v1/object/public/Icone%20autre/Miniature%20encadree%20sans%20titre.png)',
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                            backgroundRepeat: 'no-repeat'
+                          }}
+                        >
                           {exercise.thumb_url ? (
                             <img 
                               src={exercise.thumb_url} 
