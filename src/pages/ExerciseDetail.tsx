@@ -127,7 +127,15 @@ export default function ExerciseDetail() {
 
           {/* Vidéo ou placeholder */}
           <Card>
-            <CardContent className="p-0">
+            <CardContent 
+              className="p-0"
+              style={{
+                backgroundImage: 'url(https://vblqvkqkmdmlcxxphwks.supabase.co/storage/v1/object/public/Icone%20autre/Miniature%20encadree%20sans%20titre.png)',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat'
+              }}
+            >
               <div 
                 className="relative aspect-[9/16] max-h-[70vh] rounded-lg overflow-hidden mx-auto"
                 style={{
