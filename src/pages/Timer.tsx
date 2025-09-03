@@ -4,6 +4,7 @@ import { Play, Pause, RotateCcw, CheckCircle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Slider } from "@/components/ui/slider";
 import { Layout } from "@/components/layout/Layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -30,8 +31,9 @@ export default function Timer() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [state, setState] = useState<TimerState>('stopped');
+  const [duration, setDuration] = useState(45); // durée en minutes
   const [timeLeft, setTimeLeft] = useState(45 * 60); // 45 minutes par défaut
-  const [totalTime] = useState(45 * 60);
+  const [totalTime, setTotalTime] = useState(45 * 60);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [breakExercises, setBreakExercises] = useState<Exercise[]>([]);
   const [completedExercises, setCompletedExercises] = useState<string[]>([]);
@@ -71,9 +73,9 @@ export default function Timer() {
       .limit(20);
 
     if (allExercises && allExercises.length > 0) {
-      // Sélectionner 2-3 exercices aléatoires
+      // Sélectionner 2-5 exercices aléatoires
       const shuffled = [...allExercises].sort(() => 0.5 - Math.random());
-      return shuffled.slice(0, 3);
+      return shuffled.slice(0, 5);
     }
     return [];
   };
@@ -93,7 +95,7 @@ export default function Timer() {
       const { data: session, error } = await supabase
         .from('sessions')
         .insert([{
-          duration_minutes: Math.floor(totalTime / 60),
+          duration_minutes: duration,
         } as any])
         .select()
         .single();
@@ -105,7 +107,7 @@ export default function Timer() {
       
       toast({
         title: "Session démarrée",
-        description: `Session de ${Math.floor(totalTime / 60)} minutes commencée.`,
+        description: `Session de ${duration} minutes commencée.`,
       });
     } catch (error) {
       console.error('Error starting session:', error);
@@ -166,6 +168,21 @@ export default function Timer() {
     setSessionId(null);
     setBreakExercises([]);
     setCompletedExercises([]);
+  };
+
+  // Gestion des contrôles de durée
+  const handleDurationChange = (newDuration: number) => {
+    if (state === 'stopped') {
+      setDuration(newDuration);
+      const newTotalTime = newDuration * 60;
+      setTimeLeft(newTotalTime);
+      setTotalTime(newTotalTime);
+    }
+  };
+
+  const handleSliderChange = (value: number[]) => {
+    const newDuration = value[0];
+    handleDurationChange(newDuration);
   };
 
   const markExerciseCompleted = (exerciseId: string) => {
@@ -302,15 +319,20 @@ export default function Timer() {
               <CardContent className="p-8">
                 <div className="relative mb-6">
                   <div className="mx-auto h-48 w-48 rounded-full border-8 border-secondary flex items-center justify-center relative overflow-hidden">
-                    <div 
+                     <div 
                       className="absolute inset-0 rounded-full border-8 border-primary transition-all duration-1000"
                       style={{
                         background: `conic-gradient(hsl(var(--primary)) ${progress * 3.6}deg, transparent 0deg)`,
                         clipPath: 'inset(0 0 50% 0)',
                       }}
                     />
-                    <div className="relative z-10 text-center">
-                      <div className="text-3xl font-heading font-bold text-primary">
+                    <div className="relative z-20 text-center">
+                      <div 
+                        className="text-3xl font-heading font-bold transition-colors duration-300"
+                        style={{
+                          color: state === 'running' ? '#E67E22' : 'hsl(var(--primary))'
+                        }}
+                      >
                         {formatTime(timeLeft)}
                       </div>
                       <div className="text-sm text-muted-foreground mt-1">
@@ -321,6 +343,44 @@ export default function Timer() {
                     </div>
                   </div>
                 </div>
+
+                {/* Contrôles de durée */}
+                {state === 'stopped' && (
+                  <div className="space-y-4 mb-6">
+                    {/* Boutons de choix rapide */}
+                    <div className="flex gap-2 justify-center">
+                      {[30, 45, 60].map((minutes) => (
+                        <Button
+                          key={minutes}
+                          variant={duration === minutes ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handleDurationChange(minutes)}
+                        >
+                          {minutes} min
+                        </Button>
+                      ))}
+                    </div>
+
+                    {/* Slider manuel */}
+                    <div className="space-y-2">
+                      <div className="text-sm text-muted-foreground text-center">
+                        Durée personnalisée: {duration} minutes
+                      </div>
+                      <Slider
+                        value={[duration]}
+                        onValueChange={handleSliderChange}
+                        min={5}
+                        max={60}
+                        step={5}
+                        className="w-full"
+                      />
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>5 min</span>
+                        <span>60 min</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <Progress value={progress} className="mb-6" />
 
@@ -376,7 +436,7 @@ export default function Timer() {
               <CardHeader>
                 <CardTitle className="text-lg font-heading">Programmes de séances</CardTitle>
                 <CardDescription>
-                  Séances prédéfinies de 3 exercices que vous pouvez lancer à tout moment
+                  Séances prédéfinies de 3 à 5 exercices que vous pouvez lancer à tout moment
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -395,7 +455,7 @@ export default function Timer() {
                           {program.description}
                         </p>
                         <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                          <span>3 exercices</span>
+                          <span>3-5 exercices</span>
                           <span>•</span>
                           <span>~5 minutes</span>
                         </div>
