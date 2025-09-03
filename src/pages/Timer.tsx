@@ -320,10 +320,9 @@ export default function Timer() {
                 <div className="relative mb-6">
                   <div className="mx-auto h-48 w-48 rounded-full border-8 border-secondary flex items-center justify-center relative overflow-hidden">
                      <div 
-                      className="absolute inset-0 rounded-full border-8 border-primary transition-all duration-1000"
+                      className="absolute inset-0 rounded-full transition-all duration-1000"
                       style={{
                         background: `conic-gradient(hsl(var(--primary)) ${progress * 3.6}deg, transparent 0deg)`,
-                        clipPath: 'inset(0 0 50% 0)',
                       }}
                     />
                     <div className="relative z-20 text-center">
