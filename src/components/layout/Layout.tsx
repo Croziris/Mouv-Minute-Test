@@ -12,19 +12,19 @@ export function Layout({ children, showBottomNav = true }: LayoutProps) {
       <Header />
       
       <main className="flex-1 overflow-auto">
-        <div className={showBottomNav ? "pb-28" : "pb-12"}>
+        <div className={showBottomNav ? "pb-32" : "pb-16"}>
           {children}
+          
+          {/* Footer positioned within main content, above bottom nav */}
+          <footer className="mt-8 pt-6 pb-4 border-t border-border">
+            <div className="container mx-auto px-4">
+              <p className="text-center text-sm text-muted-foreground">
+                Droit d'auteur © 2025 CROZIER Pierre kinésithérapeute
+              </p>
+            </div>
+          </footer>
         </div>
       </main>
-
-      {/* Footer */}
-      <footer className="bg-background border-t border-border py-4">
-        <div className="container mx-auto px-4">
-          <p className="text-center text-sm text-muted-foreground">
-            Droit d'auteur © 2025 CROZIER Pierre kinésithérapeute
-          </p>
-        </div>
-      </footer>
       
       {showBottomNav && <BottomNav />}
     </div>
