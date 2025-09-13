@@ -105,7 +105,7 @@ export function BasicTimer({ onTimerEnd }: BasicTimerProps) {
     }
   }, [isRunning]);
 
-  const progress = durationMin > 0 ? ((durationMin * 60 - remainingSec) / (durationMin * 60)) * 100 : 0;
+  const progress = durationMin > 0 ? (remainingSec / (durationMin * 60)) * 100 : 100;
   const canStart = Number.isFinite(durationMin) && durationMin > 0;
 
   return (
@@ -203,7 +203,6 @@ export function BasicTimer({ onTimerEnd }: BasicTimerProps) {
             />
             <div className="flex justify-between text-xs text-muted-foreground mt-2">
               <span>{MIN_DURATION} min</span>
-              <span className="font-semibold">{durationMin} min</span>
               <span>{MAX_DURATION} min</span>
             </div>
           </div>
