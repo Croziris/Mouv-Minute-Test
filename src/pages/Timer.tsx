@@ -1,19 +1,21 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Play, Pause, RotateCcw, CheckCircle, Shield, Info, Bell } from "lucide-react";
+import { Play, Pause, RotateCcw, CheckCircle, Shield, Info, Bell, LogIn, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Callout } from "@/components/ui/callout";
 import { Layout } from "@/components/layout/Layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { useDeadlineTimer } from "@/hooks/useDeadlineTimer";
 import { PushNotificationButton } from "@/components/PushNotificationButton";
 import { usePushSetup } from "@/hooks/usePushSetup";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { logHealthCheck } from "@/utils/healthCheck";
+import { usePerformanceMonitor } from "@/utils/performanceUtils";
 
 type TimerState = 'stopped' | 'running' | 'paused' | 'break';
 
@@ -32,8 +34,12 @@ interface Program {
   order_index: number;
 }
 
-// Feature flag check
-const ENABLE_TIMER = process.env.VITE_ENABLE_TIMER !== 'false';
+// Constantes
+const ENABLE_TIMER = import.meta.env.VITE_ENABLE_TIMER !== 'false';
+const DEFAULT_DURATION = 45 * 60 * 1000; // 45 minutes
+
+// Feature flag check  
+const ENABLE_TIMER_LEGACY = process.env.VITE_ENABLE_TIMER !== 'false';
 
 function TimerDisabled() {
   return (
@@ -64,8 +70,16 @@ function TimerDisabled() {
 
 function TimerComponent() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  
+  // Performance monitoring
+  const cleanupPerf = usePerformanceMonitor('TimerComponent');
+  
+  useEffect(() => {
+    return cleanupPerf;
+  }, [cleanupPerf]);
   
   // État du timer et des exercices
   const [state, setState] = useState<TimerState>('stopped');
@@ -93,7 +107,14 @@ function TimerComponent() {
     // État des notifications pour cette session
     const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
-    // Charger les paramètres d'URL au montage
+  // Initialiser la durée par défaut au montage
+  useEffect(() => {
+    if (timer.durationMs !== DEFAULT_DURATION) {
+      timer.setDuration(DEFAULT_DURATION);
+    }
+  }, []); // Only run once on mount
+
+  // Charger les paramètres d'URL au montage
   useEffect(() => {
     const restart = searchParams.get('restart');
     if (restart) {
@@ -476,37 +497,66 @@ function TimerComponent() {
                 </div>
               </div>
 
-              {/* Contrôles du timer */}
-              <div className="flex gap-4">
-                <Button
-                  onClick={toggleTimer}
-                  size="lg"
-                  className="font-semibold"
-                  disabled={!user}
+              {/* Contrôles du timer ou message de connexion */}
+              {!user ? (
+                <Callout 
+                  variant="info" 
+                  title="Connexion requise" 
+                  icon={<Shield className="h-5 w-5" />}
+                  className="max-w-md mx-auto"
                 >
-                  {timer.isRunning ? (
-                    <>
-                      <Pause className="h-5 w-5 mr-2" />
-                      Pause
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-5 w-5 mr-2" />
-                      {state === 'paused' ? 'Reprendre' : 'Démarrer'}
-                    </>
-                  )}
-                </Button>
-                
-                <Button
-                  onClick={resetTimer}
-                  variant="outline"
-                  size="lg"
-                  disabled={state === 'stopped'}
-                >
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  Reset
-                </Button>
-              </div>
+                  <p className="mb-4">Connecte-toi pour démarrer une session et recevoir les rappels.</p>
+                  <div className="flex gap-2">
+                    <Button 
+                      size="sm" 
+                      onClick={() => navigate('/auth')}
+                      className="flex-1"
+                    >
+                      <LogIn className="h-4 w-4 mr-2" />
+                      Se connecter
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => navigate('/auth')}
+                      className="flex-1"
+                    >
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Créer un compte
+                    </Button>
+                  </div>
+                </Callout>
+              ) : (
+                <div className="flex gap-4">
+                  <Button
+                    onClick={toggleTimer}
+                    size="lg"
+                    className="font-semibold"
+                  >
+                    {timer.isRunning ? (
+                      <>
+                        <Pause className="h-5 w-5 mr-2" />
+                        Pause
+                      </>
+                    ) : (
+                      <>
+                        <Play className="h-5 w-5 mr-2" />
+                        {state === 'paused' ? 'Reprendre' : 'Démarrer'}
+                      </>
+                    )}
+                  </Button>
+                  
+                  <Button
+                    onClick={resetTimer}
+                    variant="outline"
+                    size="lg"
+                    disabled={state === 'stopped'}
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Reset
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* Configuration de la durée (seulement quand arrêté) */}
@@ -515,7 +565,7 @@ function TimerComponent() {
                 <div className="text-center">
                   <h3 className="font-heading text-lg mb-4">Durée de la session</h3>
                   <div className="grid grid-cols-3 gap-3 max-w-md mx-auto mb-4">
-                    {[15, 25, 45].map((minutes) => (
+                    {[30, 45, 60].map((minutes) => (
                       <Button
                         key={minutes}
                         variant={Math.round(timer.durationMs / 60000) === minutes ? 'default' : 'outline'}
@@ -535,13 +585,13 @@ function TimerComponent() {
                       value={[Math.round(timer.durationMs / 60000)]}
                       onValueChange={handleSliderChange}
                       min={5}
-                      max={120}
+                      max={90}
                       step={5}
                       className="max-w-md mx-auto"
                     />
                     <div className="text-xs text-muted-foreground flex justify-between max-w-md mx-auto">
                       <span>5 min</span>
-                      <span>2h</span>
+                      <span>90 min</span>
                     </div>
                   </div>
                 </div>
