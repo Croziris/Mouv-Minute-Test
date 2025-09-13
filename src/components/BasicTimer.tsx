@@ -191,18 +191,19 @@ export function BasicTimer({ onTimerEnd }: BasicTimerProps) {
 
         {/* Slider de durée */}
         {!isRunning && remainingSec === durationMin * 60 && (
-          <div className="w-64 px-4">
+          <div className="w-80 px-4">
             <Slider
               value={[durationMin]}
               onValueChange={handleDurationChange}
               min={MIN_DURATION}
               max={MAX_DURATION}
               step={STEP_DURATION}
-              className="w-full"
+              className="w-full h-4"
               aria-label="Durée de la session en minutes"
             />
-            <div className="flex justify-between text-xs text-muted-foreground mt-1">
+            <div className="flex justify-between text-xs text-muted-foreground mt-2">
               <span>{MIN_DURATION} min</span>
+              <span className="font-semibold">{durationMin} min</span>
               <span>{MAX_DURATION} min</span>
             </div>
           </div>
