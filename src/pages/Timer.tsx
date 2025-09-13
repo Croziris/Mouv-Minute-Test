@@ -1,23 +1,18 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { Play, Pause, RotateCcw, CheckCircle, Shield, Info, Bell, LogIn, UserPlus } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { CheckCircle, Shield, Bell, LogIn, UserPlus, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Slider } from "@/components/ui/slider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Callout } from "@/components/ui/callout";
 import { Layout } from "@/components/layout/Layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useDeadlineTimer } from "@/hooks/useDeadlineTimer";
+import { BasicTimer } from "@/components/BasicTimer";
 import { PushNotificationButton } from "@/components/PushNotificationButton";
 import { usePushSetup } from "@/hooks/usePushSetup";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { logHealthCheck } from "@/utils/healthCheck";
-import { usePerformanceMonitor } from "@/utils/performanceUtils";
-import { useSafeTimer } from "@/hooks/useSafeTimer";
-import { logCrashTestResults } from "@/utils/crashTestUtils";
 
 type TimerState = 'stopped' | 'running' | 'paused' | 'break';
 
@@ -38,10 +33,6 @@ interface Program {
 
 // Constantes
 const ENABLE_TIMER = import.meta.env.VITE_ENABLE_TIMER !== 'false';
-const DEFAULT_DURATION = 45 * 60 * 1000; // 45 minutes
-
-// Feature flag check  
-const ENABLE_TIMER_LEGACY = process.env.VITE_ENABLE_TIMER !== 'false';
 
 function TimerDisabled() {
   return (
@@ -58,7 +49,6 @@ function TimerDisabled() {
           </CardHeader>
           <CardContent>
             <Alert>
-              <Info className="h-4 w-4" />
               <AlertDescription>
                 Pour les développeurs : définissez <code>VITE_ENABLE_TIMER=true</code> dans vos variables d'environnement.
               </AlertDescription>
@@ -74,67 +64,19 @@ function TimerComponent() {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   
-  // Performance monitoring - sécurisé pour SSR
-  const cleanupPerf = usePerformanceMonitor('TimerComponent');
-  const safeTimer = useSafeTimer();
-  
-  useEffect(() => {
-    // Test crash au démarrage (dev uniquement)
-    if (process.env.NODE_ENV !== 'production') {
-      logCrashTestResults();
-    }
-    return cleanupPerf;
-  }, [cleanupPerf]);
-  
-  // État du timer et des exercices
+  // État des exercices et sessions
   const [state, setState] = useState<TimerState>('stopped');
   const [breakExercises, setBreakExercises] = useState<Exercise[]>([]);
   const [completedExercises, setCompletedExercises] = useState<string[]>([]);
   const [programs, setPrograms] = useState<Program[]>([]);
-  const [selectedProgram, setSelectedProgram] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
-  // Hook pour le timer basé sur échéance
-  const timer = useDeadlineTimer({
-    onTimeUp: () => {
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('Timer terminé, transition vers break');
-        logHealthCheck(timer);
-      }
-      handleTimeUp();
-    }
-  });
+  // Hook pour les notifications push
+  const pushSetup = usePushSetup();
 
-    // Hook pour les notifications push
-    const pushSetup = usePushSetup();
-    const { scheduleNotification } = pushSetup;
-
-    // État des notifications pour cette session
-    const [notificationsEnabled, setNotificationsEnabled] = useState(false);
-
-  // Initialiser la durée par défaut au montage
-  useEffect(() => {
-    if (timer.durationMs !== DEFAULT_DURATION) {
-      timer.setDuration(DEFAULT_DURATION);
-    }
-  }, []); // Only run once on mount
-
-  // Charger les paramètres d'URL au montage
-  useEffect(() => {
-    const restart = searchParams.get('restart');
-    if (restart) {
-      const minutes = parseInt(restart) / 60;
-      if (minutes > 0) {
-        timer.setDuration(minutes * 60 * 1000);
-        toast({
-          title: "Timer configuré",
-          description: `Prêt pour une session de ${minutes} minutes`,
-        });
-      }
-    }
-  }, [searchParams]);
+  // État des notifications pour cette session
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
   // Charger les programmes disponibles
   useEffect(() => {
@@ -152,9 +94,7 @@ function TimerComponent() {
     fetchPrograms();
   }, []);
 
-  const formatTime = (ms: number) => {
-    return timer.formatTime(ms);
-  };
+  // TODO: Réintégrer les features deadline/background derrière un feature flag si nécessaire
 
   const getRandomExercises = async () => {
     const { data: allExercises } = await supabase
@@ -169,7 +109,7 @@ function TimerComponent() {
     return [];
   };
 
-  const startSession = async () => {
+  const startSession = async (durationMinutes: number) => {
     if (!user) {
       toast({
         title: "Connexion requise",
@@ -185,7 +125,7 @@ function TimerComponent() {
         .from('sessions')
         .insert({
           user_id: user.id,
-          duration_minutes: Math.round(timer.durationMs / 60000),
+          duration_minutes: durationMinutes,
           started_at: new Date().toISOString()
         })
         .select()
@@ -193,26 +133,13 @@ function TimerComponent() {
 
       if (error) throw error;
 
-      // Démarrer le timer avec l'ID de session
-      timer.start(undefined, session.id);
       setSessionId(session.id);
       setState('running');
 
-      // Programmer la notification si activée
-      if (notificationsEnabled && pushSetup.status === 'subscribed') {
-        const endAt = new Date(Date.now() + timer.durationMs);
-        await scheduleNotification(endAt, session.id);
-        
-        toast({
-          title: "Session démarrée",
-          description: "Vous recevrez une notification à la fin de la session.",
-        });
-      } else {
-        toast({
-          title: "Session démarrée",
-          description: `Timer lancé pour ${Math.round(timer.durationMs / 60000)} minutes.`,
-        });
-      }
+      toast({
+        title: "Session démarrée",
+        description: `Timer lancé pour ${durationMinutes} minutes.`,
+      });
 
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') {
@@ -226,7 +153,7 @@ function TimerComponent() {
     }
   };
 
-  const handleTimeUp = async () => {
+  const handleTimerEnd = async () => {
     setState('break');
     
     // Récupérer des exercices pour la pause
@@ -234,7 +161,7 @@ function TimerComponent() {
     setBreakExercises(exercises);
     setCompletedExercises([]);
 
-    // Notification locale de secours si les push notifications ne marchent pas
+    // Notification locale simple
     if (typeof window !== 'undefined' && notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
       try {
         new Notification('Session terminée 🎉', {
@@ -249,34 +176,11 @@ function TimerComponent() {
     }
   };
 
-  const toggleTimer = () => {
-    if (timer.isRunning) {
-      timer.pause();
-      setState('paused');
-    } else if (state === 'paused') {
-      timer.resume();
-      setState('running');
-    } else {
-      startSession();
-    }
-  };
-
-  const resetTimer = () => {
-    timer.reset();
+  const resetSession = () => {
     setState('stopped');
     setBreakExercises([]);
     setCompletedExercises([]);
     setSessionId(null);
-  };
-
-  const handleDurationChange = (newDuration: number) => {
-    if (state === 'stopped') {
-      timer.setDuration(newDuration * 60 * 1000);
-    }
-  };
-
-  const handleSliderChange = (value: number[]) => {
-    handleDurationChange(value[0]);
   };
 
   const markExerciseCompleted = (exerciseId: string) => {
@@ -314,7 +218,7 @@ function TimerComponent() {
         description: `Félicitations ! Vous avez terminé ${completedExercises.length} exercices.`,
       });
 
-      resetTimer();
+      resetSession();
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') {
         console.error('Erreur lors de la finalisation:', error);
@@ -342,7 +246,6 @@ function TimerComponent() {
         setBreakExercises(programExercises as Exercise[]);
         setCompletedExercises([]);
         setState('break');
-        setSelectedProgram(programId);
       }
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') {
@@ -355,7 +258,6 @@ function TimerComponent() {
     setNotificationsEnabled(enabled);
   };
 
-  const progress = timer.progress;
   const allExercisesCompleted = breakExercises.length > 0 && completedExercises.length === breakExercises.length;
 
   if (state === 'break') {
@@ -437,7 +339,7 @@ function TimerComponent() {
             )}
             
             <Button 
-              onClick={resetTimer} 
+              onClick={resetSession} 
               variant="outline" 
               size="lg"
             >
@@ -462,147 +364,38 @@ function TimerComponent() {
             </CardDescription>
           </CardHeader>
           
-          <CardContent className="space-y-8">
-            {/* Affichage du temps */}
-            <div className="flex flex-col items-center space-y-6">
-              <div className="relative w-64 h-64">
-                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                  {/* Cercle de fond */}
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="45"
-                    stroke="currentColor"
-                    strokeWidth="8"
-                    fill="none"
-                    className="text-muted/20"
-                  />
-                  
-                  {/* Cercle de progression */}
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="45"
-                    stroke="currentColor"
-                    strokeWidth="8"
-                    fill="none"
-                    className="text-primary transition-all duration-1000 ease-out"
-                    strokeDasharray={`${2 * Math.PI * 45}`}
-                    strokeDashoffset={`${2 * Math.PI * 45 * (1 - progress / 100)}`}
-                    strokeLinecap="round"
-                  />
-                </svg>
-                
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <div className="text-4xl font-mono font-bold text-foreground">
-                    {formatTime(timer.remainingMs)}
-                  </div>
-                  <div className="text-sm text-muted-foreground mt-1">
-                    {state === 'running' ? 'En cours' : 
-                     state === 'paused' ? 'En pause' : 'Arrêté'}
-                  </div>
-                </div>
-              </div>
-
-              {/* Contrôles du timer ou message de connexion */}
-              {!user ? (
-                <Callout 
-                  variant="info" 
-                  title="Connexion requise" 
-                  icon={<Shield className="h-5 w-5" />}
-                  className="max-w-md mx-auto"
-                >
-                  <p className="mb-4">Connecte-toi pour démarrer une session et recevoir les rappels.</p>
-                  <div className="flex gap-2">
-                    <Button 
-                      size="sm" 
-                      onClick={() => navigate('/auth')}
-                      className="flex-1"
-                    >
-                      <LogIn className="h-4 w-4 mr-2" />
-                      Se connecter
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => navigate('/auth')}
-                      className="flex-1"
-                    >
-                      <UserPlus className="h-4 w-4 mr-2" />
-                      Créer un compte
-                    </Button>
-                  </div>
-                </Callout>
-              ) : (
-                <div className="flex gap-4">
-                  <Button
-                    onClick={toggleTimer}
-                    size="lg"
-                    className="font-semibold"
+          <CardContent>
+            {/* Message de connexion ou Timer */}
+            {!user ? (
+              <Callout 
+                variant="info" 
+                title="Connexion requise" 
+                icon={<Shield className="h-5 w-5" />}
+                className="max-w-md mx-auto"
+              >
+                <p className="mb-4">Connecte-toi pour démarrer une session et recevoir les rappels.</p>
+                <div className="flex gap-2">
+                  <Button 
+                    size="sm" 
+                    onClick={() => navigate('/auth')}
+                    className="flex-1"
                   >
-                    {timer.isRunning ? (
-                      <>
-                        <Pause className="h-5 w-5 mr-2" />
-                        Pause
-                      </>
-                    ) : (
-                      <>
-                        <Play className="h-5 w-5 mr-2" />
-                        {state === 'paused' ? 'Reprendre' : 'Démarrer'}
-                      </>
-                    )}
+                    <LogIn className="h-4 w-4 mr-2" />
+                    Se connecter
                   </Button>
-                  
-                  <Button
-                    onClick={resetTimer}
+                  <Button 
+                    size="sm" 
                     variant="outline"
-                    size="lg"
-                    disabled={state === 'stopped'}
+                    onClick={() => navigate('/auth')}
+                    className="flex-1"
                   >
-                    <RotateCcw className="h-4 w-4 mr-2" />
-                    Reset
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Créer un compte
                   </Button>
                 </div>
-              )}
-            </div>
-
-            {/* Configuration de la durée (seulement quand arrêté) */}
-            {state === 'stopped' && (
-              <div className="space-y-6">
-                <div className="text-center">
-                  <h3 className="font-heading text-lg mb-4">Durée de la session</h3>
-                  <div className="grid grid-cols-3 gap-3 max-w-md mx-auto mb-4">
-                    {[30, 45, 60].map((minutes) => (
-                      <Button
-                        key={minutes}
-                        variant={Math.round(timer.durationMs / 60000) === minutes ? 'default' : 'outline'}
-                        onClick={() => handleDurationChange(minutes)}
-                        className="font-medium"
-                      >
-                        {minutes} min
-                      </Button>
-                    ))}
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="text-2xl font-mono font-bold">
-                      {Math.round(timer.durationMs / 60000)} minutes
-                    </div>
-                    <Slider
-                      value={[Math.round(timer.durationMs / 60000)]}
-                      onValueChange={handleSliderChange}
-                      min={5}
-                      max={90}
-                      step={5}
-                      className="max-w-md mx-auto"
-                    />
-                    <div className="text-xs text-muted-foreground flex justify-between max-w-md mx-auto">
-                      <span>5 min</span>
-                      <span>90 min</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              </Callout>
+            ) : (
+              <BasicTimer onTimerEnd={handleTimerEnd} />
             )}
           </CardContent>
         </Card>
