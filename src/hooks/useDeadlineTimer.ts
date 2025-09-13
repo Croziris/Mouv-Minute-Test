@@ -32,22 +32,25 @@ export function useDeadlineTimer(options: UseDeadlineTimerOptions = {}) {
     return Math.max(0, endAt - now);
   }, []);
 
-  // Persister l'état dans IndexedDB
+  // Persister l'état dans localStorage avec protection
   const persistState = useCallback(async (newState: TimerState) => {
+    if (typeof window === 'undefined') return;
+    
     try {
-      // Fallback vers localStorage si IndexedDB échoue
       const stateToStore = {
         ...newState,
         timestamp: Date.now()
       };
       localStorage.setItem('timer_state', JSON.stringify(stateToStore));
     } catch (error) {
-      console.error('Erreur lors de la sauvegarde de l\'état du timer:', error);
+      console.warn('Erreur lors de la sauvegarde de l\'état du timer:', error);
     }
   }, []);
 
-  // Charger l'état depuis le stockage
+  // Charger l'état depuis le stockage avec protection
   const loadPersistedState = useCallback(async (): Promise<TimerState | null> => {
+    if (typeof window === 'undefined') return null;
+    
     try {
       const stored = localStorage.getItem('timer_state');
       if (stored) {
@@ -58,14 +61,14 @@ export function useDeadlineTimer(options: UseDeadlineTimerOptions = {}) {
           return {
             startAt: parsedState.startAt,
             endAt: parsedState.endAt,
-            durationMs: parsedState.durationMs,
+            durationMs: parsedState.durationMs || 45 * 60 * 1000,
             isRunning: parsedState.isRunning,
             sessionId: parsedState.sessionId
           };
         }
       }
     } catch (error) {
-      console.error('Erreur lors du chargement de l\'état du timer:', error);
+      console.warn('Erreur lors du chargement de l\'état du timer:', error);
     }
     return null;
   }, []);
@@ -99,6 +102,8 @@ export function useDeadlineTimer(options: UseDeadlineTimerOptions = {}) {
 
   // Gestion de la visibilité de la page
   useEffect(() => {
+    if (typeof document === 'undefined') return;
+    
     const handleVisibilityChange = async () => {
       if (!document.hidden && state.endAt && state.isRunning) {
         const remaining = calculateRemaining(state.endAt);
@@ -115,10 +120,13 @@ export function useDeadlineTimer(options: UseDeadlineTimerOptions = {}) {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [state.endAt, state.isRunning, calculateRemaining, onTimeUp]);
 
-  // Timer principal pour mettre à jour l'affichage
+  // Timer principal pour mettre à jour l'affichage (throttlé)
   useEffect(() => {
     if (state.isRunning && state.endAt) {
       intervalRef.current = setInterval(() => {
+        // Ne mettre à jour que si la page est visible
+        if (typeof document !== 'undefined' && document.hidden) return;
+        
         const remaining = calculateRemaining(state.endAt!);
         setRemainingMs(remaining);
 
@@ -126,7 +134,7 @@ export function useDeadlineTimer(options: UseDeadlineTimerOptions = {}) {
           setState(prev => ({ ...prev, isRunning: false }));
           onTimeUp?.();
         }
-      }, 1000);
+      }, 500); // 500ms au lieu de 1s pour plus de fluidité
     } else {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -148,10 +156,27 @@ export function useDeadlineTimer(options: UseDeadlineTimerOptions = {}) {
     onStateChange?.(state);
   }, [state, persistState, onStateChange]);
 
+  // Nettoyage au unmount
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, []);
+
   // Fonctions de contrôle
   const start = useCallback((durationMs?: number, sessionId?: string) => {
     const now = Date.now();
     const duration = durationMs || state.durationMs;
+    
+    // Protection contre les valeurs invalides
+    if (!duration || isNaN(duration) || duration <= 0) {
+      console.warn('Durée invalide pour le timer:', duration);
+      return;
+    }
+    
     const endAt = now + duration;
 
     const newState: TimerState = {
@@ -193,6 +218,11 @@ export function useDeadlineTimer(options: UseDeadlineTimerOptions = {}) {
   }, [state.durationMs]);
 
   const setDuration = useCallback((durationMs: number) => {
+    if (isNaN(durationMs) || durationMs <= 0) {
+      console.warn('Durée invalide:', durationMs);
+      return;
+    }
+    
     setState(prev => ({ ...prev, durationMs }));
     if (!state.isRunning) {
       setRemainingMs(durationMs);
@@ -216,6 +246,7 @@ export function useDeadlineTimer(options: UseDeadlineTimerOptions = {}) {
     
     // Utilitaires
     formatTime: (ms: number) => {
+      if (isNaN(ms) || ms < 0) return '00:00';
       const totalSeconds = Math.ceil(ms / 1000);
       const minutes = Math.floor(totalSeconds / 60);
       const seconds = totalSeconds % 60;

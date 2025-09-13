@@ -1,12 +1,9 @@
-// Timer refondu avec notifications push et fonctionnement en arrière-plan
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Play, Pause, RotateCcw, CheckCircle, Clock, Bell, BellOff, Shield } from "lucide-react";
+import { Play, Pause, RotateCcw, CheckCircle, Shield, Info, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Slider } from "@/components/ui/slider";
-import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Layout } from "@/components/layout/Layout";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,6 +12,8 @@ import { toast } from "@/hooks/use-toast";
 import { useDeadlineTimer } from "@/hooks/useDeadlineTimer";
 import { PushNotificationButton } from "@/components/PushNotificationButton";
 import { usePushSetup } from "@/hooks/usePushSetup";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { logHealthCheck } from "@/utils/healthCheck";
 
 type TimerState = 'stopped' | 'running' | 'paused' | 'break';
 
@@ -33,7 +32,37 @@ interface Program {
   order_index: number;
 }
 
-export default function Timer() {
+// Feature flag check
+const ENABLE_TIMER = process.env.VITE_ENABLE_TIMER !== 'false';
+
+function TimerDisabled() {
+  return (
+    <Layout>
+      <div className="container mx-auto px-4 py-8 max-w-2xl">
+        <Card className="border-warning/20 bg-warning/5">
+          <CardHeader className="text-center">
+            <CardTitle className="text-xl font-heading text-warning">
+              Timer temporairement désactivé
+            </CardTitle>
+            <CardDescription>
+              Cette fonctionnalité est en cours de maintenance. Elle sera bientôt disponible.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                Pour les développeurs : définissez <code>VITE_ENABLE_TIMER=true</code> dans vos variables d'environnement.
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
+      </div>
+    </Layout>
+  );
+}
+
+function TimerComponent() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -49,7 +78,10 @@ export default function Timer() {
   // Hook pour le timer basé sur échéance
   const timer = useDeadlineTimer({
     onTimeUp: () => {
-      console.log('Timer terminé, transition vers break');
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Timer terminé, transition vers break');
+        logHealthCheck(timer);
+      }
       handleTimeUp();
     }
   });
@@ -155,7 +187,9 @@ export default function Timer() {
       }
 
     } catch (error) {
-      console.error('Erreur lors du démarrage de la session:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Erreur lors du démarrage de la session:', error);
+      }
       toast({
         title: "Erreur",
         description: "Impossible de démarrer la session.",
@@ -173,11 +207,17 @@ export default function Timer() {
     setCompletedExercises([]);
 
     // Notification locale de secours si les push notifications ne marchent pas
-    if (notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
-      new Notification('Session terminée 🎉', {
-        body: 'Il est temps de faire tes exercices.',
-        icon: '/icon-192.png'
-      });
+    if (typeof window !== 'undefined' && notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
+      try {
+        new Notification('Session terminée 🎉', {
+          body: 'Il est temps de faire tes exercices.',
+          icon: '/icon-192.png'
+        });
+      } catch (error) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('Notification failed:', error);
+        }
+      }
     }
   };
 
@@ -248,7 +288,9 @@ export default function Timer() {
 
       resetTimer();
     } catch (error) {
-      console.error('Erreur lors de la finalisation:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Erreur lors de la finalisation:', error);
+      }
       toast({
         title: "Erreur",
         description: "Impossible de sauvegarder la session.",
@@ -275,7 +317,9 @@ export default function Timer() {
         setSelectedProgram(programId);
       }
     } catch (error) {
-      console.error('Erreur lors du chargement du programme:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Erreur lors du chargement du programme:', error);
+      }
     }
   };
 
@@ -560,5 +604,17 @@ export default function Timer() {
         )}
       </div>
     </Layout>
+  );
+}
+
+export default function Timer() {
+  if (!ENABLE_TIMER) {
+    return <TimerDisabled />;
+  }
+
+  return (
+    <ErrorBoundary>
+      <TimerComponent />
+    </ErrorBoundary>
   );
 }
