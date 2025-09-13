@@ -1,10 +1,10 @@
 /**
- * Composant bouton pour activer/désactiver les notifications push
- * Interface non bloquante avec gestion des états
+ * Composant bouton pour activer/désactiver les notifications
+ * Interface simple et claire pour l'utilisateur
  */
 
 import { useEffect } from 'react';
-import { Bell, BellOff, Loader2, AlertTriangle, Shield, TestTube, AlertCircle } from 'lucide-react';
+import { Bell, BellOff, Loader2, AlertTriangle, Shield, TestTube } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { usePushSetup } from '@/hooks/usePushSetup';
@@ -82,14 +82,14 @@ export function PushNotificationButton({ onStatusChange }: PushNotificationButto
 
       toast({
         title: "Test envoyé !",
-        description: `${data.sent_count} notification(s) de test envoyée(s). Vérifiez vos appareils.`,
+        description: `${data.sent_count} notification(s) de test envoyée(s).`,
       });
 
     } catch (error) {
       console.error('Erreur lors du test de notification:', error);
       toast({
         title: "Erreur de test",
-        description: "Impossible d'envoyer la notification de test. Vérifiez votre connexion.",
+        description: "Impossible d'envoyer la notification de test.",
         variant: "destructive",
       });
     }
@@ -144,7 +144,7 @@ export function PushNotificationButton({ onStatusChange }: PushNotificationButto
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex-1">
-          <h3 className="font-medium">Notifications push</h3>
+          <h3 className="font-medium">Notifications</h3>
           <p className="text-sm text-muted-foreground">
             Recevez des alertes pour ne jamais manquer vos pauses actives
           </p>
@@ -175,7 +175,7 @@ export function PushNotificationButton({ onStatusChange }: PushNotificationButto
         </div>
       </div>
 
-      {/* Messages d'état */}
+      {/* Messages simples */}
       {status === 'subscribed' && (
         <Alert>
           <Shield className="h-4 w-4" />
@@ -189,11 +189,7 @@ export function PushNotificationButton({ onStatusChange }: PushNotificationButto
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            <strong>Erreur :</strong> {error}
-            <br />
-            <span className="text-xs mt-1 block">
-              Vérifiez que vous avez autorisé les notifications dans les paramètres de votre navigateur.
-            </span>
+            Une erreur s'est produite. Réessayez ou vérifiez les paramètres de votre navigateur.
           </AlertDescription>
         </Alert>
       )}
@@ -202,7 +198,7 @@ export function PushNotificationButton({ onStatusChange }: PushNotificationButto
         <Alert variant="default">
           <Bell className="h-4 w-4" />
           <AlertDescription>
-            Activez les notifications pour recevoir des rappels automatiques à la fin de vos sessions de travail.
+            Activez les notifications pour recevoir des rappels à la fin de vos sessions.
           </AlertDescription>
         </Alert>
       )}
