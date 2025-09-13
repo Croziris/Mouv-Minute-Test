@@ -114,27 +114,6 @@ export function BasicTimer({ onTimerEnd }: BasicTimerProps) {
       {!isRunning && remainingSec === durationMin * 60 && (
         <div className="space-y-4">
           <h3 className="font-heading text-lg text-center">Durée de la session</h3>
-          <div className="space-y-3">
-            <div className="text-center">
-              <span className="text-sm text-muted-foreground">Durée : </span>
-              <span className="font-semibold">{durationMin} min</span>
-            </div>
-            <div className="w-64 px-4">
-              <Slider
-                value={[durationMin]}
-                onValueChange={handleDurationChange}
-                min={MIN_DURATION}
-                max={MAX_DURATION}
-                step={STEP_DURATION}
-                className="w-full"
-                aria-label="Durée de la session en minutes"
-              />
-              <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                <span>{MIN_DURATION} min</span>
-                <span>{MAX_DURATION} min</span>
-              </div>
-            </div>
-          </div>
         </div>
       )}
 
@@ -209,6 +188,25 @@ export function BasicTimer({ onTimerEnd }: BasicTimerProps) {
             Reset
           </Button>
         </div>
+
+        {/* Slider de durée */}
+        {!isRunning && remainingSec === durationMin * 60 && (
+          <div className="w-64 px-4">
+            <Slider
+              value={[durationMin]}
+              onValueChange={handleDurationChange}
+              min={MIN_DURATION}
+              max={MAX_DURATION}
+              step={STEP_DURATION}
+              className="w-full"
+              aria-label="Durée de la session en minutes"
+            />
+            <div className="flex justify-between text-xs text-muted-foreground mt-1">
+              <span>{MIN_DURATION} min</span>
+              <span>{MAX_DURATION} min</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
