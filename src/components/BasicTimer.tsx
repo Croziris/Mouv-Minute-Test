@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Play, Pause, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Slider } from '@/components/ui/slider';
 
 interface BasicTimerProps {
   onTimerEnd?: () => void;
 }
 
-const DURATION_OPTIONS = [5, 10, 15, 20, 30, 45, 60]; // minutes
+const MIN_DURATION = 5; // minutes
+const MAX_DURATION = 90; // minutes
+const STEP_DURATION = 5; // minutes
 
 export function BasicTimer({ onTimerEnd }: BasicTimerProps) {
   const [durationMin, setDurationMin] = useState<number>(45);
@@ -87,13 +89,19 @@ export function BasicTimer({ onTimerEnd }: BasicTimerProps) {
     setRemainingSec(durationMin * 60);
   }, [durationMin]);
 
-  const handleDurationChange = useCallback((value: string) => {
-    const minutes = Number.parseInt(value, 10);
-    if (!Number.isFinite(minutes) || minutes <= 0) return;
+  const handleDurationChange = useCallback((values: number[]) => {
+    if (!values || values.length === 0) return;
     
-    setDurationMin(minutes);
+    const minutes = values[0];
+    if (!Number.isFinite(minutes) || minutes < MIN_DURATION || minutes > MAX_DURATION) return;
+    
+    // Arrondir au multiple de 5 le plus proche
+    const roundedMinutes = Math.round(minutes / STEP_DURATION) * STEP_DURATION;
+    const clampedMinutes = Math.max(MIN_DURATION, Math.min(MAX_DURATION, roundedMinutes));
+    
+    setDurationMin(clampedMinutes);
     if (!isRunning) {
-      setRemainingSec(minutes * 60);
+      setRemainingSec(clampedMinutes * 60);
     }
   }, [isRunning]);
 
@@ -106,19 +114,26 @@ export function BasicTimer({ onTimerEnd }: BasicTimerProps) {
       {!isRunning && remainingSec === durationMin * 60 && (
         <div className="space-y-4">
           <h3 className="font-heading text-lg text-center">Durée de la session</h3>
-          <div className="flex justify-center">
-            <Select value={durationMin.toString()} onValueChange={handleDurationChange}>
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="Durée" />
-              </SelectTrigger>
-              <SelectContent>
-                {DURATION_OPTIONS.map((minutes) => (
-                  <SelectItem key={minutes} value={minutes.toString()}>
-                    {minutes} min
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="space-y-3">
+            <div className="text-center">
+              <span className="text-sm text-muted-foreground">Durée : </span>
+              <span className="font-semibold">{durationMin} min</span>
+            </div>
+            <div className="w-64 px-4">
+              <Slider
+                value={[durationMin]}
+                onValueChange={handleDurationChange}
+                min={MIN_DURATION}
+                max={MAX_DURATION}
+                step={STEP_DURATION}
+                className="w-full"
+                aria-label="Durée de la session en minutes"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                <span>{MIN_DURATION} min</span>
+                <span>{MAX_DURATION} min</span>
+              </div>
+            </div>
           </div>
         </div>
       )}
