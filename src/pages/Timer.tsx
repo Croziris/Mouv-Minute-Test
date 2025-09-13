@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Play, Pause, RotateCcw, CheckCircle, Shield, Info, Bell, LogIn, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,8 @@ import { usePushSetup } from "@/hooks/usePushSetup";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { logHealthCheck } from "@/utils/healthCheck";
 import { usePerformanceMonitor } from "@/utils/performanceUtils";
+import { useSafeTimer } from "@/hooks/useSafeTimer";
+import { logCrashTestResults } from "@/utils/crashTestUtils";
 
 type TimerState = 'stopped' | 'running' | 'paused' | 'break';
 
@@ -74,10 +76,15 @@ function TimerComponent() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   
-  // Performance monitoring
+  // Performance monitoring - sécurisé pour SSR
   const cleanupPerf = usePerformanceMonitor('TimerComponent');
+  const safeTimer = useSafeTimer();
   
   useEffect(() => {
+    // Test crash au démarrage (dev uniquement)
+    if (process.env.NODE_ENV !== 'production') {
+      logCrashTestResults();
+    }
     return cleanupPerf;
   }, [cleanupPerf]);
   

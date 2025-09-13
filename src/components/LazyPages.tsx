@@ -7,3 +7,4 @@ export const LazyArchivesConseils = lazy(() => import('@/pages/ArchivesConseils'
 export const LazyArticleDetail = lazy(() => import('@/pages/ArticleDetail'));
 export const LazySession = lazy(() => import('@/pages/Session'));
 export const LazyProfile = lazy(() => import('@/pages/Profile'));
+export const LazyCrashTest = lazy(() => import('@/pages/CrashTest'));

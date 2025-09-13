@@ -9,7 +9,7 @@ import Home from "./pages/Home";
 import Timer from "./pages/Timer";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
-import { LazyExercises, LazyExerciseDetail, LazyArchivesConseils, LazyArticleDetail, LazySession, LazyProfile } from "./components/LazyPages";
+import { LazyExercises, LazyExerciseDetail, LazyArchivesConseils, LazyArticleDetail, LazySession, LazyProfile, LazyCrashTest } from "./components/LazyPages";
 
 const queryClient = new QueryClient();
 
@@ -50,6 +50,11 @@ const App = () => (
           <Route path="/profile" element={
             <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Chargement...</div>}>
               <LazyProfile />
+            </Suspense>
+          } />
+          <Route path="/crash-test" element={
+            <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Chargement...</div>}>
+              <LazyCrashTest />
             </Suspense>
           } />
           <Route path="/auth" element={<Auth />} />

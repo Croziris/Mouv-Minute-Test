@@ -26,11 +26,15 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Forcer une instance unique de React pour éviter les conflits
+      "react": path.resolve(__dirname, "./node_modules/react"),
+      "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
     },
   },
   define: {
     // Définir les variables d'environnement pour le front
     'process.env.VITE_ENABLE_TIMER': JSON.stringify(process.env.VITE_ENABLE_TIMER || 'true'),
+    'process.env.VITE_ENABLE_TOOLTIP': JSON.stringify(process.env.VITE_ENABLE_TOOLTIP || 'true'),
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || mode),
   }
 }));
