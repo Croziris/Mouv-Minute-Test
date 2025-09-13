@@ -41,12 +41,7 @@ export function PushNotificationButton({ onStatusChange }: PushNotificationButto
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            Les notifications push ne sont pas disponibles sur cet appareil.
-            {/* Aide contextuelle selon la plateforme */}
-            <br />
-            <span className="text-xs mt-1 block">
-              💡 Sur iOS : installez l'app sur votre écran d'accueil
-            </span>
+            Les notifications ne sont pas disponibles sur cet appareil.
           </AlertDescription>
         </Alert>
       </div>
@@ -186,10 +181,6 @@ export function PushNotificationButton({ onStatusChange }: PushNotificationButto
           <Shield className="h-4 w-4" />
           <AlertDescription>
             Vous recevrez des rappels automatiques à la fin de vos sessions.
-            <br />
-            <span className="text-xs">
-              💡 Pour recevoir les notifications même navigateur fermé, installez l'app PWA
-            </span>
           </AlertDescription>
         </Alert>
       )}
@@ -215,19 +206,6 @@ export function PushNotificationButton({ onStatusChange }: PushNotificationButto
           </AlertDescription>
         </Alert>
       )}
-
-      {/* Message d'information sur les limitations PWA */}
-      <Alert variant="default">
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription className="text-sm">
-          <strong>Limitations PWA :</strong> Le compte à rebours en direct dans la barre de notification n'est pas disponible. 
-          Vous recevrez une notification complète à la fin de votre session.
-          <br />
-          <span className="text-muted-foreground">
-            Alternatives disponibles : badge d'application, rappels à mi-parcours, maintien de l'écran allumé.
-          </span>
-        </AlertDescription>
-      </Alert>
     </div>
   );
 }

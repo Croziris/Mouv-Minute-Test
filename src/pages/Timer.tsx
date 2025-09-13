@@ -11,7 +11,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { BasicTimer } from "@/components/BasicTimer";
 import { PushNotificationButton } from "@/components/PushNotificationButton";
-import { PWALimitations } from "@/components/PWALimitations";
 import { usePushSetup } from "@/hooks/usePushSetup";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
@@ -418,8 +417,6 @@ function TimerComponent() {
           </CardContent>
         </Card>
 
-        {/* Informations sur les limitations PWA */}
-        <PWALimitations />
 
         {/* Programmes recommandés */}
         {programs.length > 0 && (
