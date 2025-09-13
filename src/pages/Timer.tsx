@@ -1,14 +1,16 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Play, Pause, RotateCcw, CheckCircle, Clock } from "lucide-react";
+import { Play, Pause, RotateCcw, CheckCircle, Clock, Bell, BellOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { Layout } from "@/components/layout/Layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { usePWA } from "@/hooks/usePWA";
 
 type TimerState = 'stopped' | 'running' | 'paused' | 'break';
 
@@ -39,6 +41,15 @@ export default function Timer() {
   const [completedExercises, setCompletedExercises] = useState<string[]>([]);
   const [programs, setPrograms] = useState<Program[]>([]);
   const [selectedProgram, setSelectedProgram] = useState<string | null>(null);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+
+  // Hook PWA pour notifications
+  const { 
+    supportsNotifications, 
+    notificationPermission, 
+    requestNotificationPermission,
+    showLocalNotification 
+  } = usePWA();
 
   // Timer logic
   useEffect(() => {
@@ -138,11 +149,12 @@ export default function Timer() {
         .insert(sessionExercises);
     }
 
-    // Notification si possible
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification('Mouv\'Minute - Temps de pause !', {
+    // Notification si activée
+    if (notificationsEnabled && notificationPermission === 'granted') {
+      showLocalNotification('Mouv\'Minute - Temps de pause !', {
         body: 'C\'est l\'heure de faire quelques exercices.',
-        icon: '/favicon.ico',
+        tag: 'break-reminder',
+        requireInteraction: true,
       });
     }
 
@@ -247,12 +259,28 @@ export default function Timer() {
     fetchPrograms();
   }, []);
 
-  // Demander la permission pour les notifications
+  // Initialiser les notifications
   useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
+    // Vérifier si les notifications étaient précédemment activées
+    const savedNotificationState = localStorage.getItem('notifications-enabled');
+    if (savedNotificationState === 'true' && notificationPermission === 'granted') {
+      setNotificationsEnabled(true);
     }
-  }, []);
+  }, [notificationPermission]);
+
+  // Gérer l'activation/désactivation des notifications
+  const handleNotificationToggle = async (enabled: boolean) => {
+    if (enabled && notificationPermission !== 'granted') {
+      const granted = await requestNotificationPermission();
+      if (granted) {
+        setNotificationsEnabled(true);
+        localStorage.setItem('notifications-enabled', 'true');
+      }
+    } else {
+      setNotificationsEnabled(enabled);
+      localStorage.setItem('notifications-enabled', enabled.toString());
+    }
+  };
 
   const launchProgram = async (programId: string) => {
     try {
@@ -429,6 +457,41 @@ export default function Timer() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Contrôle des notifications - Version simplifiée intégrée */}
+            {supportsNotifications && (
+              <Card className="bg-accent/10 border-accent/20">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {notificationsEnabled ? (
+                        <Bell className="h-5 w-5 text-accent" />
+                      ) : (
+                        <BellOff className="h-5 w-5 text-muted-foreground" />
+                      )}
+                      <div>
+                        <p className="text-sm font-medium">Notifications de rappel</p>
+                        <p className="text-xs text-muted-foreground">
+                          Recevoir des alertes à la fin des sessions
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={notificationsEnabled}
+                      onCheckedChange={handleNotificationToggle}
+                    />
+                  </div>
+                  
+                  {notificationPermission === 'denied' && (
+                    <div className="mt-3 p-2 bg-destructive/10 rounded-md">
+                      <p className="text-xs text-destructive">
+                        Notifications bloquées. Réactivez-les dans les paramètres de votre navigateur.
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Programmes de séances */}
             <Card>

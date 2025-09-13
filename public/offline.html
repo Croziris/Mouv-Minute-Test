@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mouv'Minute - Mode hors ligne</title>
+    <style>
+        :root {
+            --primary: #8DA47E;
+            --accent: #E67E22;
+            --background: #F4F5F0;
+            --foreground: #333333;
+            --muted: #666666;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--background);
+            color: var(--foreground);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        
+        .container {
+            text-align: center;
+            max-width: 400px;
+            padding: 2rem;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(141, 164, 126, 0.1);
+        }
+        
+        .icon {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 1.5rem;
+            background: var(--primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+        }
+        
+        h1 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--primary);
+        }
+        
+        p {
+            color: var(--muted);
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+        }
+        
+        .retry-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .retry-btn:hover {
+            background: #7a9170;
+        }
+        
+        .offline-features {
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #eee;
+        }
+        
+        .feature {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+            text-align: left;
+            font-size: 0.9rem;
+            color: var(--muted);
+        }
+        
+        .feature-icon {
+            width: 20px;
+            height: 20px;
+            background: var(--accent);
+            border-radius: 50%;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">📱</div>
+        
+        <h1>Mouv'Minute</h1>
+        <p>Vous êtes actuellement hors ligne. Certaines fonctionnalités restent disponibles :</p>
+        
+        <div class="offline-features">
+            <div class="feature">
+                <div class="feature-icon">⏰</div>
+                <span>Timer de session (sans sauvegarde)</span>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">💪</div>
+                <span>Exercices mis en cache</span>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🔔</div>
+                <span>Notifications locales</span>
+            </div>
+        </div>
+        
+        <button class="retry-btn" onclick="window.location.reload()">
+            Réessayer la connexion
+        </button>
+        
+        <script>
+            // Automatiquement rafraîchir quand la connexion revient
+            window.addEventListener('online', () => {
+                window.location.reload();
+            });
+            
+            // Afficher le statut de connexion
+            if (navigator.onLine) {
+                window.location.reload();
+            }
+        </script>
+    </div>
+</body>
+</html>
