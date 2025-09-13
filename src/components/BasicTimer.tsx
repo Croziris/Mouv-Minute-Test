@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Play, Pause, RotateCcw } from 'lucide-react';
+import { Play, Pause, RotateCcw, Smartphone, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
+import { useBadgeAPI } from '@/hooks/useBadgeAPI';
+import { useWakeLock } from '@/hooks/useWakeLock';
 
 interface BasicTimerProps {
   onTimerEnd?: () => void;
@@ -15,6 +18,14 @@ export function BasicTimer({ onTimerEnd }: BasicTimerProps) {
   const [durationMin, setDurationMin] = useState<number>(45);
   const [remainingSec, setRemainingSec] = useState<number>(0);
   const [isRunning, setIsRunning] = useState<boolean>(false);
+  
+  // Options avancées
+  const [badgeEnabled, setBadgeEnabled] = useState(false);
+  const [wakeLockEnabled, setWakeLockEnabled] = useState(false);
+  
+  // Hooks pour les fonctionnalités avancées
+  const { isSupported: badgeSupported, setBadge, clearBadge } = useBadgeAPI();
+  const { isSupported: wakeLockSupported, isActive: wakeLockActive, requestWakeLock, releaseWakeLock } = useWakeLock();
   
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -41,9 +52,27 @@ export function BasicTimer({ onTimerEnd }: BasicTimerProps) {
       intervalRef.current = setInterval(() => {
         setRemainingSec(prev => {
           const newValue = prev - 1;
+          
+          // Mettre à jour le badge si activé
+          if (badgeEnabled && badgeSupported && newValue > 0) {
+            const minutesLeft = Math.ceil(newValue / 60);
+            setBadge(minutesLeft);
+          }
+          
           if (newValue <= 0) {
             setIsRunning(false);
             onTimerEnd?.();
+            
+            // Libérer le wake lock à la fin
+            if (wakeLockActive) {
+              releaseWakeLock();
+            }
+            
+            // Effacer le badge à la fin
+            if (badgeEnabled) {
+              clearBadge();
+            }
+            
             return 0;
           }
           return newValue;
@@ -71,23 +100,43 @@ export function BasicTimer({ onTimerEnd }: BasicTimerProps) {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }, []);
 
-  const handleStart = useCallback(() => {
+  const handleStart = useCallback(async () => {
     if (!Number.isFinite(durationMin) || durationMin <= 0) return;
     
     if (remainingSec <= 0) {
       setRemainingSec(durationMin * 60);
     }
     setIsRunning(true);
-  }, [durationMin, remainingSec]);
+    
+    // Activer le wake lock si demandé
+    if (wakeLockEnabled && wakeLockSupported) {
+      await requestWakeLock();
+    }
+  }, [durationMin, remainingSec, wakeLockEnabled, wakeLockSupported, requestWakeLock]);
 
-  const handlePause = useCallback(() => {
+  const handlePause = useCallback(async () => {
     setIsRunning(false);
-  }, []);
+    
+    // Libérer le wake lock en pause
+    if (wakeLockActive) {
+      await releaseWakeLock();
+    }
+  }, [wakeLockActive, releaseWakeLock]);
 
-  const handleReset = useCallback(() => {
+  const handleReset = useCallback(async () => {
     setIsRunning(false);
     setRemainingSec(durationMin * 60);
-  }, [durationMin]);
+    
+    // Libérer le wake lock
+    if (wakeLockActive) {
+      await releaseWakeLock();
+    }
+    
+    // Effacer le badge
+    if (badgeEnabled) {
+      clearBadge();
+    }
+  }, [durationMin, wakeLockActive, releaseWakeLock, badgeEnabled, clearBadge]);
 
   const handleDurationChange = useCallback((values: number[]) => {
     if (!values || values.length === 0) return;
@@ -205,6 +254,48 @@ export function BasicTimer({ onTimerEnd }: BasicTimerProps) {
               <span>{MIN_DURATION} min</span>
               <span>{MAX_DURATION} min</span>
             </div>
+          </div>
+        )}
+
+        {/* Options avancées */}
+        {!isRunning && remainingSec === durationMin * 60 && (
+          <div className="mt-6 pt-4 border-t space-y-4 w-80">
+            <h4 className="text-sm font-medium text-muted-foreground text-center">Options avancées</h4>
+            
+            {badgeSupported && (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Smartphone className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">Badge de l'application</span>
+                  <span className="text-xs text-muted-foreground">(minutes restantes)</span>
+                </div>
+                <Switch
+                  checked={badgeEnabled}
+                  onCheckedChange={setBadgeEnabled}
+                />
+              </div>
+            )}
+            
+            {wakeLockSupported && (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Moon className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">Maintenir l'écran allumé</span>
+                  <span className="text-xs text-muted-foreground">(évite la veille)</span>
+                </div>
+                <Switch
+                  checked={wakeLockEnabled}
+                  onCheckedChange={setWakeLockEnabled}
+                />
+              </div>
+            )}
+            
+            {wakeLockActive && (
+              <div className="text-xs text-success flex items-center justify-center gap-1">
+                <Moon className="h-3 w-3" />
+                Écran maintenu allumé
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -124,10 +124,7 @@ self.addEventListener('fetch', (event) => {
 
 // Gestion des événements push (notifications)
 self.addEventListener('push', (event) => {
-  // Logs conditionnels pour le développement
-  if (typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production') {
-    console.log('[SW] Push notification received');
-  }
+  console.log('[SW] Push notification received');
   
   let notificationData = {
     title: 'Session terminée 🎉',
@@ -139,28 +136,33 @@ self.addEventListener('push', (event) => {
       { action: 'open-exercises', title: 'Voir exercices' },
       { action: 'restart-timer', title: 'Relancer 5 min' }
     ],
-    requireInteraction: true,
-    tag: 'session-end',
+    requireInteraction: false, // Changé pour Android
+    tag: 'mouv-minute-notification',
     renotify: true,
-    vibrate: [200, 100, 200]
+    vibrate: [200, 100, 200],
+    silent: false
   };
 
   // Parser les données de la notification push si présentes
   if (event.data) {
     try {
       const pushData = event.data.json();
+      console.log('[SW] Données push reçues:', pushData);
       notificationData = {
         ...notificationData,
         ...pushData,
-        data: { ...notificationData.data, ...pushData.data }
+        data: { ...notificationData.data, ...(pushData.data || {}) }
       };
     } catch (error) {
-      if (typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production') {
-        console.warn('[SW] Erreur lors du parsing des données push:', error);
+      console.warn('[SW] Erreur lors du parsing des données push:', error);
+      // Utiliser le text brut si JSON échoue
+      if (event.data.text) {
+        notificationData.body = event.data.text();
       }
     }
   }
 
+  // CRITIQUE : Toujours afficher une notification sur Android
   event.waitUntil(
     self.registration.showNotification(notificationData.title, {
       body: notificationData.body,
@@ -171,14 +173,19 @@ self.addEventListener('push', (event) => {
       requireInteraction: notificationData.requireInteraction,
       tag: notificationData.tag,
       renotify: notificationData.renotify,
-      vibrate: notificationData.vibrate
+      vibrate: notificationData.vibrate,
+      silent: notificationData.silent
     }).then(() => {
-      if (typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production') {
-        console.log('[SW] Notification affichée avec succès');
-      }
+      console.log('[SW] Notification affichée avec succès:', notificationData.title);
     }).catch((error) => {
-      // Toujours logger les erreurs
-      console.error('[SW] Erreur lors de l\'affichage de la notification:', error);
+      console.error('[SW] ERREUR CRITIQUE - Échec d\'affichage de la notification:', error);
+      
+      // Fallback : essayer une notification minimale
+      return self.registration.showNotification('Mouv\'Minute', {
+        body: 'Une notification est arrivée',
+        icon: '/icon-192.png',
+        tag: 'fallback-notification'
+      });
     })
   );
 });
