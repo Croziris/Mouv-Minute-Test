@@ -124,7 +124,10 @@ self.addEventListener('fetch', (event) => {
 
 // Gestion des événements push (notifications)
 self.addEventListener('push', (event) => {
-  console.log('[SW] Push notification received');
+  // Logs conditionnels pour le développement
+  if (typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production') {
+    console.log('[SW] Push notification received');
+  }
   
   let notificationData = {
     title: 'Session terminée 🎉',
@@ -152,7 +155,9 @@ self.addEventListener('push', (event) => {
         data: { ...notificationData.data, ...pushData.data }
       };
     } catch (error) {
-      console.warn('[SW] Erreur lors du parsing des données push:', error);
+      if (typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production') {
+        console.warn('[SW] Erreur lors du parsing des données push:', error);
+      }
     }
   }
 
@@ -168,8 +173,11 @@ self.addEventListener('push', (event) => {
       renotify: notificationData.renotify,
       vibrate: notificationData.vibrate
     }).then(() => {
-      console.log('[SW] Notification affichée avec succès');
+      if (typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production') {
+        console.log('[SW] Notification affichée avec succès');
+      }
     }).catch((error) => {
+      // Toujours logger les erreurs
       console.error('[SW] Erreur lors de l\'affichage de la notification:', error);
     })
   );
@@ -177,7 +185,9 @@ self.addEventListener('push', (event) => {
 
 // Gestion des clics sur les notifications
 self.addEventListener('notificationclick', (event) => {
-  console.log('[SW] Notification clicked, action:', event.action);
+  if (typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production') {
+    console.log('[SW] Notification clicked, action:', event.action);
+  }
   
   event.notification.close();
 

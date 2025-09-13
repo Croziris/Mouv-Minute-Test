@@ -13,7 +13,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useDeadlineTimer } from "@/hooks/useDeadlineTimer";
-import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { PushNotificationButton } from "@/components/PushNotificationButton";
+import { usePushSetup } from "@/hooks/usePushSetup";
 
 type TimerState = 'stopped' | 'running' | 'paused' | 'break';
 
@@ -53,20 +54,14 @@ export default function Timer() {
     }
   });
 
-  // Hook pour les notifications push
-  const {
-    isSupported: pushSupported,
-    isSubscribed: isPushSubscribed,
-    loading: pushLoading,
-    subscribe: subscribeToPush,
-    unsubscribe: unsubscribeFromPush,
-    scheduleSessionEndNotification
-  } = usePushNotifications();
+    // Hook pour les notifications push
+    const pushSetup = usePushSetup();
+    const { scheduleNotification } = pushSetup;
 
-  // État des notifications pour cette session
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+    // État des notifications pour cette session
+    const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
-  // Charger les paramètres d'URL au montage
+    // Charger les paramètres d'URL au montage
   useEffect(() => {
     const restart = searchParams.get('restart');
     if (restart) {
@@ -144,9 +139,9 @@ export default function Timer() {
       setState('running');
 
       // Programmer la notification si activée
-      if (notificationsEnabled && isPushSubscribed) {
+      if (notificationsEnabled && pushSetup.status === 'subscribed') {
         const endAt = new Date(Date.now() + timer.durationMs);
-        await scheduleSessionEndNotification(endAt, session.id);
+        await scheduleNotification(endAt, session.id);
         
         toast({
           title: "Session démarrée",
@@ -284,18 +279,8 @@ export default function Timer() {
     }
   };
 
-  const handleNotificationToggle = async (enabled: boolean) => {
-    if (enabled && !isPushSubscribed) {
-      const success = await subscribeToPush();
-      if (success) {
-        setNotificationsEnabled(true);
-      }
-    } else if (!enabled && isPushSubscribed) {
-      setNotificationsEnabled(false);
-      // Optionnel: désabonner complètement
-    } else {
-      setNotificationsEnabled(enabled);
-    }
+  const handleNotificationToggle = (enabled: boolean) => {
+    setNotificationsEnabled(enabled);
   };
 
   const progress = timer.progress;
@@ -534,50 +519,7 @@ export default function Timer() {
           </CardHeader>
           
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {notificationsEnabled ? (
-                  <Bell className="h-5 w-5 text-primary" />
-                ) : (
-                  <BellOff className="h-5 w-5 text-muted-foreground" />
-                )}
-                <div>
-                  <div className="font-medium">
-                    {notificationsEnabled ? 'Notifications activées' : 'Notifications désactivées'}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {isPushSubscribed 
-                      ? 'Vous recevrez des rappels automatiques' 
-                      : 'Activez pour recevoir des rappels automatiques'
-                    }
-                  </div>
-                </div>
-              </div>
-              
-              <Switch
-                checked={notificationsEnabled}
-                onCheckedChange={handleNotificationToggle}
-                disabled={!pushSupported || pushLoading}
-              />
-            </div>
-
-            {!pushSupported && (
-              <Alert>
-                <Shield className="h-4 w-4" />
-                <AlertDescription>
-                  Les notifications push ne sont pas supportées sur ce navigateur.
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {pushSupported && !isPushSubscribed && notificationsEnabled && (
-              <Alert>
-                <Bell className="h-4 w-4" />
-                <AlertDescription>
-                  Les notifications seront activées lors du prochain démarrage de session.
-                </AlertDescription>
-              </Alert>
-            )}
+            <PushNotificationButton onStatusChange={handleNotificationToggle} />
           </CardContent>
         </Card>
 
