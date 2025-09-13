@@ -1,16 +1,18 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Play, Pause, RotateCcw, CheckCircle, Clock, Bell, BellOff } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { Play, Pause, RotateCcw, CheckCircle, Clock, Bell, BellOff, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Layout } from "@/components/layout/Layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { usePWA } from "@/hooks/usePWA";
+import { useDeadlineTimer } from "@/hooks/useDeadlineTimer";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 type TimerState = 'stopped' | 'running' | 'paused' | 'break';
 
@@ -32,49 +34,70 @@ interface Program {
 export default function Timer() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  
+  // État du timer et des exercices
   const [state, setState] = useState<TimerState>('stopped');
-  const [duration, setDuration] = useState(45); // durée en minutes
-  const [timeLeft, setTimeLeft] = useState(45 * 60); // 45 minutes par défaut
-  const [totalTime, setTotalTime] = useState(45 * 60);
-  const [sessionId, setSessionId] = useState<string | null>(null);
   const [breakExercises, setBreakExercises] = useState<Exercise[]>([]);
   const [completedExercises, setCompletedExercises] = useState<string[]>([]);
   const [programs, setPrograms] = useState<Program[]>([]);
   const [selectedProgram, setSelectedProgram] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+
+  // Hook pour le timer basé sur échéance
+  const timer = useDeadlineTimer({
+    onTimeUp: () => {
+      console.log('Timer terminé, transition vers break');
+      handleTimeUp();
+    }
+  });
+
+  // Hook pour les notifications push
+  const {
+    isSupported: pushSupported,
+    isSubscribed: isPushSubscribed,
+    loading: pushLoading,
+    subscribe: subscribeToPush,
+    unsubscribe: unsubscribeFromPush,
+    scheduleSessionEndNotification
+  } = usePushNotifications();
+
+  // État des notifications pour cette session
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
-  // Hook PWA pour notifications
-  const { 
-    supportsNotifications, 
-    notificationPermission, 
-    requestNotificationPermission,
-    showLocalNotification 
-  } = usePWA();
-
-  // Timer logic
+  // Charger les paramètres d'URL au montage
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    
-    if (state === 'running' && timeLeft > 0) {
-      interval = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            // Temps écoulé, passer en pause
-            handleTimeUp();
-            return 0;
-          }
-          return prev - 1;
+    const restart = searchParams.get('restart');
+    if (restart) {
+      const minutes = parseInt(restart) / 60;
+      if (minutes > 0) {
+        timer.setDuration(minutes * 60 * 1000);
+        toast({
+          title: "Timer configuré",
+          description: `Prêt pour une session de ${minutes} minutes`,
         });
-      }, 1000);
+      }
     }
+  }, [searchParams]);
 
-    return () => clearInterval(interval);
-  }, [state, timeLeft]);
+  // Charger les programmes disponibles
+  useEffect(() => {
+    const fetchPrograms = async () => {
+      const { data } = await supabase
+        .from('programs')
+        .select('*')
+        .order('order_index');
+      
+      if (data) {
+        setPrograms(data);
+      }
+    };
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    fetchPrograms();
+  }, []);
+
+  const formatTime = (ms: number) => {
+    return timer.formatTime(ms);
   };
 
   const getRandomExercises = async () => {
@@ -84,7 +107,6 @@ export default function Timer() {
       .limit(20);
 
     if (allExercises && allExercises.length > 0) {
-      // Sélectionner 2-5 exercices aléatoires
       const shuffled = [...allExercises].sort(() => 0.5 - Math.random());
       return shuffled.slice(0, 5);
     }
@@ -102,26 +124,42 @@ export default function Timer() {
     }
 
     try {
-      // Créer une nouvelle session (user_id is auto-set by trigger)
+      // Créer une session en base de données
       const { data: session, error } = await supabase
         .from('sessions')
-        .insert([{
-          duration_minutes: duration,
-        } as any])
+        .insert({
+          user_id: user.id,
+          duration_minutes: Math.round(timer.durationMs / 60000),
+          started_at: new Date().toISOString()
+        })
         .select()
         .single();
 
       if (error) throw error;
 
-      setSessionId(session?.id);
+      // Démarrer le timer avec l'ID de session
+      timer.start(undefined, session.id);
+      setSessionId(session.id);
       setState('running');
-      
-      toast({
-        title: "Session démarrée",
-        description: `Session de ${duration} minutes commencée.`,
-      });
+
+      // Programmer la notification si activée
+      if (notificationsEnabled && isPushSubscribed) {
+        const endAt = new Date(Date.now() + timer.durationMs);
+        await scheduleSessionEndNotification(endAt, session.id);
+        
+        toast({
+          title: "Session démarrée",
+          description: "Vous recevrez une notification à la fin de la session.",
+        });
+      } else {
+        toast({
+          title: "Session démarrée",
+          description: `Timer lancé pour ${Math.round(timer.durationMs / 60000)} minutes.`,
+        });
+      }
+
     } catch (error) {
-      console.error('Error starting session:', error);
+      console.error('Erreur lors du démarrage de la session:', error);
       toast({
         title: "Erreur",
         description: "Impossible de démarrer la session.",
@@ -133,41 +171,26 @@ export default function Timer() {
   const handleTimeUp = async () => {
     setState('break');
     
-    // Charger des exercices aléatoires
+    // Récupérer des exercices pour la pause
     const exercises = await getRandomExercises();
     setBreakExercises(exercises);
+    setCompletedExercises([]);
 
-    // Ajouter les exercices à la session
-    if (sessionId && exercises.length > 0) {
-      const sessionExercises = exercises.map(exercise => ({
-        session_id: sessionId,
-        exercise_id: exercise.id,
-      }));
-
-      await supabase
-        .from('session_exercises')
-        .insert(sessionExercises);
-    }
-
-    // Notification si activée
-    if (notificationsEnabled && notificationPermission === 'granted') {
-      showLocalNotification('Mouv\'Minute - Temps de pause !', {
-        body: 'C\'est l\'heure de faire quelques exercices.',
-        tag: 'break-reminder',
-        requireInteraction: true,
+    // Notification locale de secours si les push notifications ne marchent pas
+    if (notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
+      new Notification('Session terminée 🎉', {
+        body: 'Il est temps de faire tes exercices.',
+        icon: '/icon-192.png'
       });
     }
-
-    toast({
-      title: "⏰ Temps de pause !",
-      description: "Prenez quelques minutes pour vous étirer avec nos exercices.",
-    });
   };
 
   const toggleTimer = () => {
-    if (state === 'running') {
+    if (timer.isRunning) {
+      timer.pause();
       setState('paused');
     } else if (state === 'paused') {
+      timer.resume();
       setState('running');
     } else {
       startSession();
@@ -175,26 +198,21 @@ export default function Timer() {
   };
 
   const resetTimer = () => {
+    timer.reset();
     setState('stopped');
-    setTimeLeft(totalTime);
-    setSessionId(null);
     setBreakExercises([]);
     setCompletedExercises([]);
+    setSessionId(null);
   };
 
-  // Gestion des contrôles de durée
   const handleDurationChange = (newDuration: number) => {
     if (state === 'stopped') {
-      setDuration(newDuration);
-      const newTotalTime = newDuration * 60;
-      setTimeLeft(newTotalTime);
-      setTotalTime(newTotalTime);
+      timer.setDuration(newDuration * 60 * 1000);
     }
   };
 
   const handleSliderChange = (value: number[]) => {
-    const newDuration = value[0];
-    handleDurationChange(newDuration);
+    handleDurationChange(value[0]);
   };
 
   const markExerciseCompleted = (exerciseId: string) => {
@@ -209,411 +227,393 @@ export default function Timer() {
       await supabase
         .from('sessions')
         .update({
-          ended_at: new Date().toISOString(),
           completed: true,
+          ended_at: new Date().toISOString()
         })
         .eq('id', sessionId);
 
-      // Marquer les exercices comme terminés
-      if (completedExercises.length > 0) {
+      // Enregistrer les exercices complétés
+      const exerciseRecords = completedExercises.map(exerciseId => ({
+        session_id: sessionId,
+        exercise_id: exerciseId,
+        completed: true
+      }));
+
+      if (exerciseRecords.length > 0) {
         await supabase
           .from('session_exercises')
-          .update({ completed: true })
-          .eq('session_id', sessionId)
-          .in('exercise_id', completedExercises);
+          .insert(exerciseRecords);
       }
 
       toast({
-        title: "Séance validée !",
-        description: "Votre session a été enregistrée avec succès.",
+        title: "Session terminée !",
+        description: `Félicitations ! Vous avez terminé ${completedExercises.length} exercices.`,
       });
 
       resetTimer();
     } catch (error) {
-      console.error('Error completing session:', error);
+      console.error('Erreur lors de la finalisation:', error);
       toast({
         title: "Erreur",
-        description: "Impossible de valider la session.",
+        description: "Impossible de sauvegarder la session.",
         variant: "destructive",
       });
-    }
-  };
-
-  const progress = ((totalTime - timeLeft) / totalTime) * 100;
-  const allExercisesCompleted = breakExercises.length > 0 && 
-    breakExercises.every(exercise => completedExercises.includes(exercise.id));
-
-  // Charger les programmes
-  useEffect(() => {
-    const fetchPrograms = async () => {
-      const { data } = await supabase
-        .from('programs')
-        .select('*')
-        .order('order_index', { ascending: true });
-      
-      if (data) {
-        setPrograms(data);
-      }
-    };
-
-    fetchPrograms();
-  }, []);
-
-  // Initialiser les notifications
-  useEffect(() => {
-    // Vérifier si les notifications étaient précédemment activées
-    const savedNotificationState = localStorage.getItem('notifications-enabled');
-    if (savedNotificationState === 'true' && notificationPermission === 'granted') {
-      setNotificationsEnabled(true);
-    }
-  }, [notificationPermission]);
-
-  // Gérer l'activation/désactivation des notifications
-  const handleNotificationToggle = async (enabled: boolean) => {
-    if (enabled && notificationPermission !== 'granted') {
-      const granted = await requestNotificationPermission();
-      if (granted) {
-        setNotificationsEnabled(true);
-        localStorage.setItem('notifications-enabled', 'true');
-      }
-    } else {
-      setNotificationsEnabled(enabled);
-      localStorage.setItem('notifications-enabled', enabled.toString());
     }
   };
 
   const launchProgram = async (programId: string) => {
     try {
-      // Récupérer les exercices du programme
-      const { data: programExercises } = await supabase
+      const { data: exercises } = await supabase
         .from('program_exercises')
         .select(`
-          exercise_id,
-          order_index,
-          exercises (
-            id,
-            title,
-            description_public,
-            duration_sec,
-            zone
-          )
+          exercises (*)
         `)
         .eq('program_id', programId)
-        .order('order_index', { ascending: true });
+        .order('order_index');
 
-      if (programExercises && programExercises.length > 0) {
-        const exercises = programExercises.map(pe => pe.exercises).filter(Boolean);
-        setBreakExercises(exercises);
+      if (exercises && exercises.length > 0) {
+        const programExercises = exercises.map(pe => pe.exercises).filter(Boolean);
+        setBreakExercises(programExercises as Exercise[]);
         setCompletedExercises([]);
         setState('break');
-        
-        // Ajouter les exercices à la session si une session est active
-        if (sessionId) {
-          const sessionExercises = exercises.map(exercise => ({
-            session_id: sessionId,
-            exercise_id: exercise.id,
-          }));
-
-          await supabase
-            .from('session_exercises')
-            .insert(sessionExercises);
-        }
+        setSelectedProgram(programId);
       }
     } catch (error) {
-      console.error('Error launching program:', error);
-      toast({
-        title: "Erreur",
-        description: "Impossible de lancer le programme.",
-        variant: "destructive",
-      });
+      console.error('Erreur lors du chargement du programme:', error);
     }
   };
 
-  return (
-    <Layout>
-      <div className="container mx-auto px-4 py-6">
-        {state !== 'break' ? (
-          /* État normal - Timer */
-          <div className="max-w-md mx-auto space-y-8">
-            <div className="text-center space-y-4">
-              <h1 className="text-2xl font-heading font-bold">Session de travail</h1>
-              <p className="text-muted-foreground">
-                Concentrez-vous sur votre travail. Nous vous préviendrons quand il sera temps de faire une pause.
-              </p>
-            </div>
+  const handleNotificationToggle = async (enabled: boolean) => {
+    if (enabled && !isPushSubscribed) {
+      const success = await subscribeToPush();
+      if (success) {
+        setNotificationsEnabled(true);
+      }
+    } else if (!enabled && isPushSubscribed) {
+      setNotificationsEnabled(false);
+      // Optionnel: désabonner complètement
+    } else {
+      setNotificationsEnabled(enabled);
+    }
+  };
 
-            {/* Timer circulaire */}
-            <Card className="text-center">
-              <CardContent className="p-8">
-                <div className="relative mb-6">
-                  <div className="mx-auto h-48 w-48 rounded-full border-8 border-secondary flex items-center justify-center relative overflow-hidden">
-                     <div 
-                      className="absolute inset-0 rounded-full transition-all duration-1000"
-                      style={{
-                        background: `conic-gradient(hsl(var(--primary)) ${progress * 3.6}deg, transparent 0deg)`,
-                      }}
-                    />
-                    <div className="relative z-20 text-center">
-                      <div 
-                        className="text-3xl font-heading font-bold transition-colors duration-300"
-                        style={{
-                          color: state === 'running' ? '#E67E22' : 'hsl(var(--primary))'
-                        }}
-                      >
-                        {formatTime(timeLeft)}
-                      </div>
-                      <div className="text-sm text-muted-foreground mt-1">
-                        {state === 'stopped' && 'Prêt à commencer'}
-                        {state === 'running' && 'En cours...'}
-                        {state === 'paused' && 'En pause'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+  const progress = timer.progress;
+  const allExercisesCompleted = breakExercises.length > 0 && completedExercises.length === breakExercises.length;
 
-                {/* Contrôles de durée */}
-                {state === 'stopped' && (
-                  <div className="space-y-4 mb-6">
-                    {/* Boutons de choix rapide */}
-                    <div className="flex gap-2 justify-center">
-                      {[30, 45, 60].map((minutes) => (
-                        <Button
-                          key={minutes}
-                          variant={duration === minutes ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => handleDurationChange(minutes)}
-                        >
-                          {minutes} min
-                        </Button>
-                      ))}
-                    </div>
+  if (state === 'break') {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-8 max-w-4xl">
+          <Card className="border-success/20 bg-success/5">
+            <CardHeader className="text-center">
+              <CardTitle className="text-2xl font-heading text-success">
+                🎉 C'est l'heure de la pause !
+              </CardTitle>
+              <CardDescription>
+                Faites ces exercices pour optimiser votre bien-être
+              </CardDescription>
+            </CardHeader>
+          </Card>
 
-                    {/* Slider manuel */}
-                    <div className="space-y-2">
-                      <div className="text-sm text-muted-foreground text-center">
-                        Durée personnalisée: {duration} minutes
-                      </div>
-                      <Slider
-                        value={[duration]}
-                        onValueChange={handleSliderChange}
-                        min={5}
-                        max={60}
-                        step={5}
-                        className="w-full"
-                      />
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>5 min</span>
-                        <span>60 min</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <Progress value={progress} className="mb-6" />
-
-                <div className="flex gap-4 justify-center">
-                  <Button
-                    onClick={toggleTimer}
-                    size="lg"
-                    className={
-                      state === 'running' 
-                        ? "bg-accent hover:bg-accent-light text-accent-foreground"
-                        : "bg-primary hover:bg-primary-dark text-primary-foreground"
-                    }
-                  >
-                    {state === 'running' ? (
-                      <>
-                        <Pause className="mr-2 h-5 w-5" />
-                        Pause
-                      </>
-                    ) : (
-                      <>
-                        <Play className="mr-2 h-5 w-5" />
-                        {state === 'stopped' ? 'Démarrer' : 'Reprendre'}
-                      </>
-                    )}
-                  </Button>
-
-                  {state !== 'stopped' && (
-                    <Button onClick={resetTimer} variant="outline" size="lg">
-                      <RotateCcw className="mr-2 h-4 w-4" />
-                      Reset
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-secondary/30">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <Clock className="h-5 w-5 text-primary" />
-                  <div>
-                    <p className="text-sm font-medium">Durée recommandée</p>
-                    <p className="text-xs text-muted-foreground">
-                      45 minutes de travail, puis 3 minutes d'exercices
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Contrôle des notifications - Version simplifiée intégrée */}
-            {supportsNotifications && (
-              <Card className="bg-accent/10 border-accent/20">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      {notificationsEnabled ? (
-                        <Bell className="h-5 w-5 text-accent" />
-                      ) : (
-                        <BellOff className="h-5 w-5 text-muted-foreground" />
-                      )}
-                      <div>
-                        <p className="text-sm font-medium">Notifications de rappel</p>
-                        <p className="text-xs text-muted-foreground">
-                          Recevoir des alertes à la fin des sessions
-                        </p>
-                      </div>
-                    </div>
-                    <Switch
-                      checked={notificationsEnabled}
-                      onCheckedChange={handleNotificationToggle}
-                    />
-                  </div>
-                  
-                  {notificationPermission === 'denied' && (
-                    <div className="mt-3 p-2 bg-destructive/10 rounded-md">
-                      <p className="text-xs text-destructive">
-                        Notifications bloquées. Réactivez-les dans les paramètres de votre navigateur.
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Programmes de séances */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg font-heading">Programmes de séances</CardTitle>
-                <CardDescription>
-                  Séances prédéfinies de 3 à 5 exercices que vous pouvez lancer à tout moment
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {programs.map((program) => (
-                    <Card
-                      key={program.id}
-                      className="cursor-pointer hover:shadow-soft transition-shadow border-muted hover:border-primary/50"
-                      onClick={() => navigate(`/session/${program.id}`)}
-                    >
-                      <CardContent className="p-4">
-                        <h3 className="font-medium text-base mb-2 text-primary">
-                          {program.title}
-                        </h3>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                          {program.description}
-                        </p>
-                        <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                          <span>3-5 exercices</span>
-                          <span>•</span>
-                          <span>~5 minutes</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        ) : (
-          /* État pause - Exercices */
-          <div className="max-w-2xl mx-auto space-y-6">
-            <div className="text-center space-y-2">
-              <h1 className="text-2xl font-heading font-bold text-accent">
-                ⏰ C'est l'heure de la pause !
-              </h1>
-              <p className="text-muted-foreground">
-                Prenez quelques minutes pour vous étirer et vous détendre.
-              </p>
-            </div>
-
-            {breakExercises.length > 0 ? (
-              <div className="space-y-4">
-                {breakExercises.map((exercise) => (
-                  <Card 
-                    key={exercise.id} 
-                    className={
-                      completedExercises.includes(exercise.id)
-                        ? "border-primary bg-primary/5"
-                        : "hover:shadow-soft transition-shadow"
-                    }
-                  >
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle className="text-lg font-heading">
-                            {exercise.title}
-                          </CardTitle>
-                          <CardDescription className="text-sm">
-                            Zone: {exercise.zone} • {exercise.duration_sec}s
+          <div className="mt-6 space-y-4">
+            {breakExercises.map((exercise) => {
+              const isCompleted = completedExercises.includes(exercise.id);
+              return (
+                <Card key={exercise.id} className={`transition-all ${
+                  isCompleted 
+                    ? 'border-success/50 bg-success/10' 
+                    : 'border-accent/20 hover:border-accent/40'
+                }`}>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <CardTitle className="text-lg font-heading flex items-center gap-2">
+                          {isCompleted && <CheckCircle className="h-5 w-5 text-success" />}
+                          {exercise.title}
+                          <span className="text-sm text-muted-foreground ml-2">
+                            ({exercise.duration_sec}s • {exercise.zone})
+                          </span>
+                        </CardTitle>
+                        {exercise.description_public && (
+                          <CardDescription className="mt-1">
+                            {exercise.description_public}
                           </CardDescription>
-                        </div>
-                        {completedExercises.includes(exercise.id) ? (
-                          <CheckCircle className="h-6 w-6 text-primary" />
-                        ) : (
-                          <Button
-                            size="sm"
-                            onClick={() => markExerciseCompleted(exercise.id)}
-                            className="bg-primary hover:bg-primary-dark text-primary-foreground"
-                          >
-                            Terminé
-                          </Button>
                         )}
                       </div>
+                      
+                      {!isCompleted && (
+                        <Button
+                          onClick={() => markExerciseCompleted(exercise.id)}
+                          variant="outline"
+                          size="sm"
+                        >
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Terminé
+                        </Button>
+                      )}
+                    </div>
+                  </CardHeader>
+                </Card>
+              );
+            })}
+          </div>
+
+          <div className="mt-8 flex gap-4 justify-center">
+            {allExercisesCompleted ? (
+              <Button 
+                onClick={completeSession} 
+                size="lg" 
+                className="font-semibold"
+              >
+                <CheckCircle className="h-5 w-5 mr-2" />
+                Valider la session
+              </Button>
+            ) : (
+              <Button 
+                onClick={completeSession} 
+                variant="outline" 
+                size="lg"
+              >
+                Terminer maintenant
+              </Button>
+            )}
+            
+            <Button 
+              onClick={resetTimer} 
+              variant="outline" 
+              size="lg"
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Nouvelle session
+            </Button>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout>
+      <div className="container mx-auto px-4 py-8 max-w-4xl space-y-8">
+        {/* Timer principal */}
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader className="text-center">
+            <CardTitle className="text-3xl font-heading">Session de travail</CardTitle>
+            <CardDescription>
+              Configurez votre timer et recevez des rappels pour vos pauses actives
+            </CardDescription>
+          </CardHeader>
+          
+          <CardContent className="space-y-8">
+            {/* Affichage du temps */}
+            <div className="flex flex-col items-center space-y-6">
+              <div className="relative w-64 h-64">
+                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                  {/* Cercle de fond */}
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="45"
+                    stroke="currentColor"
+                    strokeWidth="8"
+                    fill="none"
+                    className="text-muted/20"
+                  />
+                  
+                  {/* Cercle de progression */}
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="45"
+                    stroke="currentColor"
+                    strokeWidth="8"
+                    fill="none"
+                    className="text-primary transition-all duration-1000 ease-out"
+                    strokeDasharray={`${2 * Math.PI * 45}`}
+                    strokeDashoffset={`${2 * Math.PI * 45 * (1 - progress / 100)}`}
+                    strokeLinecap="round"
+                  />
+                </svg>
+                
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <div className="text-4xl font-mono font-bold text-foreground">
+                    {formatTime(timer.remainingMs)}
+                  </div>
+                  <div className="text-sm text-muted-foreground mt-1">
+                    {state === 'running' ? 'En cours' : 
+                     state === 'paused' ? 'En pause' : 'Arrêté'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Contrôles du timer */}
+              <div className="flex gap-4">
+                <Button
+                  onClick={toggleTimer}
+                  size="lg"
+                  className="font-semibold"
+                  disabled={!user}
+                >
+                  {timer.isRunning ? (
+                    <>
+                      <Pause className="h-5 w-5 mr-2" />
+                      Pause
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-5 w-5 mr-2" />
+                      {state === 'paused' ? 'Reprendre' : 'Démarrer'}
+                    </>
+                  )}
+                </Button>
+                
+                <Button
+                  onClick={resetTimer}
+                  variant="outline"
+                  size="lg"
+                  disabled={state === 'stopped'}
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Reset
+                </Button>
+              </div>
+            </div>
+
+            {/* Configuration de la durée (seulement quand arrêté) */}
+            {state === 'stopped' && (
+              <div className="space-y-6">
+                <div className="text-center">
+                  <h3 className="font-heading text-lg mb-4">Durée de la session</h3>
+                  <div className="grid grid-cols-3 gap-3 max-w-md mx-auto mb-4">
+                    {[15, 25, 45].map((minutes) => (
+                      <Button
+                        key={minutes}
+                        variant={Math.round(timer.durationMs / 60000) === minutes ? 'default' : 'outline'}
+                        onClick={() => handleDurationChange(minutes)}
+                        className="font-medium"
+                      >
+                        {minutes} min
+                      </Button>
+                    ))}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="text-2xl font-mono font-bold">
+                      {Math.round(timer.durationMs / 60000)} minutes
+                    </div>
+                    <Slider
+                      value={[Math.round(timer.durationMs / 60000)]}
+                      onValueChange={handleSliderChange}
+                      min={5}
+                      max={120}
+                      step={5}
+                      className="max-w-md mx-auto"
+                    />
+                    <div className="text-xs text-muted-foreground flex justify-between max-w-md mx-auto">
+                      <span>5 min</span>
+                      <span>2h</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Configuration des notifications */}
+        <Card className="border-accent/20 bg-accent/5">
+          <CardHeader>
+            <CardTitle className="text-lg font-heading flex items-center gap-2">
+              <Bell className="h-5 w-5" />
+              Notifications de rappel
+            </CardTitle>
+            <CardDescription>
+              Recevoir des alertes à la fin des sessions de travail
+            </CardDescription>
+          </CardHeader>
+          
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {notificationsEnabled ? (
+                  <Bell className="h-5 w-5 text-primary" />
+                ) : (
+                  <BellOff className="h-5 w-5 text-muted-foreground" />
+                )}
+                <div>
+                  <div className="font-medium">
+                    {notificationsEnabled ? 'Notifications activées' : 'Notifications désactivées'}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {isPushSubscribed 
+                      ? 'Vous recevrez des rappels automatiques' 
+                      : 'Activez pour recevoir des rappels automatiques'
+                    }
+                  </div>
+                </div>
+              </div>
+              
+              <Switch
+                checked={notificationsEnabled}
+                onCheckedChange={handleNotificationToggle}
+                disabled={!pushSupported || pushLoading}
+              />
+            </div>
+
+            {!pushSupported && (
+              <Alert>
+                <Shield className="h-4 w-4" />
+                <AlertDescription>
+                  Les notifications push ne sont pas supportées sur ce navigateur.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {pushSupported && !isPushSubscribed && notificationsEnabled && (
+              <Alert>
+                <Bell className="h-4 w-4" />
+                <AlertDescription>
+                  Les notifications seront activées lors du prochain démarrage de session.
+                </AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Programmes recommandés */}
+        {programs.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-heading">Programmes d'exercices</CardTitle>
+              <CardDescription>
+                Sélectionnez un programme pour démarrer directement une pause active
+              </CardDescription>
+            </CardHeader>
+            
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-2">
+                {programs.map((program) => (
+                  <Card key={program.id} className="border-accent/20 hover:border-accent/40 transition-colors cursor-pointer" onClick={() => launchProgram(program.id)}>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base font-heading">{program.title}</CardTitle>
+                      {program.description && (
+                        <CardDescription className="text-sm">{program.description}</CardDescription>
+                      )}
                     </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        {exercise.description_public}
-                      </p>
-                    </CardContent>
                   </Card>
                 ))}
               </div>
-            ) : (
-              <Card>
-                <CardContent className="p-8 text-center">
-                  <p className="text-muted-foreground">
-                    Aucun exercice disponible pour le moment.
-                  </p>
-                </CardContent>
-              </Card>
-            )}
+            </CardContent>
+          </Card>
+        )}
 
-            <div className="flex gap-4 justify-center">
-              <Button
-                onClick={completeSession}
-                disabled={!allExercisesCompleted}
-                size="lg"
-                className="bg-accent hover:bg-accent-light text-accent-foreground disabled:opacity-50"
-              >
-                <CheckCircle className="mr-2 h-5 w-5" />
-                Valider la séance
-              </Button>
-              
-              <Button onClick={resetTimer} variant="outline" size="lg">
-                Nouvelle session
-              </Button>
-            </div>
-
-            {!allExercisesCompleted && (
-              <p className="text-center text-sm text-muted-foreground">
-                Terminez tous les exercices pour valider votre séance
-              </p>
-            )}
-          </div>
+        {!user && (
+          <Alert>
+            <Shield className="h-4 w-4" />
+            <AlertDescription>
+              Connectez-vous pour sauvegarder vos sessions et accéder à toutes les fonctionnalités.
+            </AlertDescription>
+          </Alert>
         )}
       </div>
     </Layout>
