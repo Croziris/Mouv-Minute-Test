@@ -189,7 +189,11 @@ export function PushNotificationButton({ onStatusChange }: PushNotificationButto
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            Une erreur s'est produite. Réessayez ou vérifiez les paramètres de votre navigateur.
+            {error.includes('VAPID') || error.includes('configuration') 
+              ? 'Configuration des notifications incomplète. Contactez l\'administrateur.' 
+              : error.includes('Permission') 
+              ? 'Permission refusée. Vérifiez les paramètres de votre navigateur.' 
+              : 'Une erreur s\'est produite. Réessayez dans quelques instants.'}
           </AlertDescription>
         </Alert>
       )}
