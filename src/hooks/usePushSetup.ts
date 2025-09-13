@@ -31,26 +31,27 @@ export function usePushSetup(options: UsePushSetupOptions = {}): UsePushSetupRet
   const [canUsePush, setCanUsePush] = useState(false);
   const [vapidPublicKey, setVapidPublicKey] = useState<string>('');
 
-  // Récupérer la clé VAPID publique
+  // Récupérer la clé VAPID publique depuis les variables d'environnement
   useEffect(() => {
-    const fetchVapidKey = async () => {
-      try {
-        const { data, error } = await supabase.functions.invoke('get-vapid-public-key');
-        
-        if (error) {
-          console.error('Erreur lors de la récupération de la clé VAPID:', error);
-          return;
-        }
-        
-        if (data?.vapid_public_key) {
-          setVapidPublicKey(data.vapid_public_key);
-        }
-      } catch (error) {
-        console.error('Erreur lors de la récupération de la clé VAPID:', error);
-      }
-    };
+    const envVapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+    
+    if (!envVapidKey) {
+      console.error('Variable VITE_VAPID_PUBLIC_KEY manquante dans .env');
+      setError('Clé VAPID publique manquante ou incorrecte, vérifiez votre configuration.');
+      setStatus('error');
+      return;
+    }
 
-    fetchVapidKey();
+    // Vérifier que la clé a le bon format (doit être une chaîne Base64URL)
+    if (typeof envVapidKey !== 'string' || envVapidKey.length < 50) {
+      console.error('Clé VAPID publique invalide - format incorrect');
+      setError('Clé VAPID publique mal formatée, vérifiez votre configuration.');
+      setStatus('error');
+      return;
+    }
+
+    setVapidPublicKey(envVapidKey.trim());
+    console.log('Clé VAPID publique chargée depuis l\'environnement');
   }, []);
 
   // Vérifier la compatibilité au montage
@@ -114,7 +115,7 @@ export function usePushSetup(options: UsePushSetupOptions = {}): UsePushSetupRet
     }
 
     if (!vapidPublicKey) {
-      setError('Configuration VAPID manquante');
+      setError('Clé VAPID publique manquante, vérifiez votre configuration.');
       setStatus('error');
       return;
     }
@@ -160,7 +161,14 @@ export function usePushSetup(options: UsePushSetupOptions = {}): UsePushSetupRet
       }
 
       // Étape 4: S'abonner aux notifications push
-      const applicationServerKey = base64UrlToUint8Array(vapidPublicKey);
+      let applicationServerKey;
+      try {
+        applicationServerKey = base64UrlToUint8Array(vapidPublicKey);
+        console.log(`Clé VAPID convertie avec succès (${applicationServerKey.length} bytes)`);
+      } catch (conversionError) {
+        console.error('Erreur de conversion clé VAPID:', conversionError);
+        throw new Error(`Clé VAPID invalide: ${conversionError instanceof Error ? conversionError.message : 'Format incorrect'}`);
+      }
       
       const subscription = await Promise.race([
         registration.pushManager.subscribe({

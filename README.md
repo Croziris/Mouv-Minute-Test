@@ -15,20 +15,57 @@ Une Progressive Web App pour gérer des sessions de travail avec des pauses acti
 
 ### Prérequis
 
-1. **VAPID Keys** : Générez une paire de clés VAPID pour les notifications push
-2. **Configuration Supabase** : Assurez-vous que les edge functions sont déployées
-3. **Service Worker** : Le fichier `public/sw.js` doit être accessible
+1. **Installation web-push** : `npm install -g web-push`
+2. **Génération clés VAPID** : `npx web-push generate-vapid-keys`
+3. **Configuration variables d'environnement**
 
-### Variables d'environnement
+### Configuration étape par étape
 
-Les notifications push nécessitent une clé VAPID publique configurée dans `src/hooks/usePushSetup.ts` :
+#### 1. Générer les clés VAPID
 
-```typescript
-// À remplacer par votre vraie clé VAPID publique
-const VAPID_PUBLIC_KEY = 'BH4dYirGhV-uuCLSmy9aALg9F8kFVgWqWJwJzK8ioxfQR1HzBdRYYXHrV-gPf5M6s_4eJ6oXVv2_b1r8f9JZjYM';
+Exécutez cette commande pour générer une paire de clés :
+
+```bash
+npx web-push generate-vapid-keys
 ```
 
-### Test pas-à-pas
+Vous obtiendrez quelque chose comme :
+
+```
+=======================================
+
+Public Key:
+BH4dYirGhV-uuCLSmy9aALg9F8kFVgWqWJwJzK8ioxfQR1HzBdRYYXHrV-gPf5M6s_4eJ6oXVv2_b1r8f9JZjYM
+
+Private Key:
+vOVgDygVt8xHDiOBNH6oEVGQ3cGUMqGPFwkqLp6YrAs
+
+=======================================
+```
+
+#### 2. Configuration front-end (Lovable)
+
+Créez un fichier `.env` dans votre projet (copie de `.env.example`) :
+
+```env
+# Notifications Push - Clé publique VAPID
+# Copiez ici la PUBLIC KEY générée ci-dessus
+VITE_VAPID_PUBLIC_KEY=BH4dYirGhV-uuCLSmy9aALg9F8kFVgWqWJwJzK8ioxfQR1HzBdRYYXHrV-gPf5M6s_4eJ6oXVv2_b1r8f9JZjYM
+
+# Autres variables...
+VITE_ENABLE_TIMER=true
+```
+
+#### 3. Configuration serveur (Supabase)
+
+Dans votre tableau de bord Supabase, allez dans **Settings > Edge Functions** et ajoutez le secret :
+
+- **Nom** : `VAPID_PRIVATE_KEY`
+- **Valeur** : La clé privée générée (ex: `vOVgDygVt8xHDiOBNH6oEVGQ3cGUMqGPFwkqLp6YrAs`)
+
+⚠️ **IMPORTANT** : Les deux clés (publique et privée) doivent correspondre à la même paire !
+
+### Test de fonctionnement
 
 #### 1. Desktop (Chrome/Edge/Firefox)
 - ✅ Ouvrir l'application
@@ -69,6 +106,18 @@ const VAPID_PUBLIC_KEY = 'BH4dYirGhV-uuCLSmy9aALg9F8kFVgWqWJwJzK8ioxfQR1HzBdRYYX
 | iOS < 16.4 | ❌ | Non supporté |
 
 ### Dépannage
+
+#### "The provided applicationServerKey is not valid"
+- ✅ Vérifiez que `VITE_VAPID_PUBLIC_KEY` est bien définie dans `.env`
+- ✅ Vérifiez que la clé est bien au format Base64URL (sans espaces ni retours à la ligne)
+- ✅ Vérifiez que les clés publique/privée correspondent à la même paire
+- ✅ Redémarrez le serveur de développement après avoir modifié `.env`
+- ✅ Copiez exactement la clé publique générée par `npx web-push generate-vapid-keys`
+
+#### "Clé VAPID publique manquante"
+- ✅ Copiez `.env.example` vers `.env`
+- ✅ Ajoutez votre clé publique VAPID dans `.env`
+- ✅ Redémarrez `npm run dev`
 
 #### "Notifications non supportées"
 - Vérifiez que vous utilisez HTTPS (requis)

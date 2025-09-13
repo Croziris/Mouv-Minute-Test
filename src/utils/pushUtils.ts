@@ -5,25 +5,51 @@
 /**
  * Convertit une clé VAPID en format Base64URL vers Uint8Array
  * Nécessaire pour l'API PushManager.subscribe()
+ * 
+ * @param base64UrlString - Clé VAPID publique au format Base64URL
+ * @returns Uint8Array compatible avec l'API PushManager
+ * @throws Error si la clé est invalide
  */
 export function base64UrlToUint8Array(base64UrlString: string): Uint8Array {
-  // Ajouter le padding manquant si nécessaire
-  const padding = '='.repeat((4 - base64UrlString.length % 4) % 4);
-  const base64 = (base64UrlString + padding)
-    .replace(/-/g, '+')
-    .replace(/_/g, '/');
-
-  // Décoder en string binaire
-  const rawData = window.atob(base64);
-  
-  // Convertir en Uint8Array
-  const outputArray = new Uint8Array(rawData.length);
-  
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
+  // Validation de base
+  if (!base64UrlString || typeof base64UrlString !== 'string') {
+    throw new Error('La clé VAPID doit être une chaîne non vide');
   }
+
+  // Nettoyer la chaîne (supprimer espaces et retours à la ligne)
+  const cleanedString = base64UrlString.trim();
   
-  return outputArray;
+  if (cleanedString.length === 0) {
+    throw new Error('La clé VAPID ne peut pas être vide');
+  }
+
+  try {
+    // Ajouter le padding manquant si nécessaire
+    const padding = '='.repeat((4 - (cleanedString.length % 4)) % 4);
+    const base64 = (cleanedString + padding)
+      .replace(/-/g, '+')
+      .replace(/_/g, '/');
+
+    // Décoder en string binaire
+    const rawData = window.atob(base64);
+    
+    // Convertir en Uint8Array
+    const outputArray = new Uint8Array(rawData.length);
+    
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    
+    // Vérifier que la taille est raisonnable pour une clé VAPID (généralement 65 bytes)
+    if (outputArray.length < 32 || outputArray.length > 100) {
+      console.warn(`Taille de clé VAPID inattendue: ${outputArray.length} bytes (attendu: ~65)`);
+    }
+    
+    return outputArray;
+  } catch (error) {
+    console.error('Erreur lors de la conversion Base64URL:', error);
+    throw new Error('Clé VAPID invalide - vérifiez le format Base64URL');
+  }
 }
 
 /**
