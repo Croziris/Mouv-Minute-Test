@@ -8,9 +8,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { base64UrlToUint8Array } from '@/utils/pushUtils';
 
-// VAPID public key - à définir dans les variables d'environnement
-const VAPID_PUBLIC_KEY = 'BH4dYirGhV-uuCLSmy9aALg9F8kFVgWqWJwJzK8ioxfQR1HzBdRYYXHrV-gPf5M6s_4eJ6oXVv2_b1r8f9JZjYM'; // Clé d'exemple, remplacez par la vraie
-
 type PushStatus = 'idle' | 'prompting' | 'subscribing' | 'subscribed' | 'error';
 
 interface UsePushSetupOptions {
@@ -32,6 +29,29 @@ export function usePushSetup(options: UsePushSetupOptions = {}): UsePushSetupRet
   const [status, setStatus] = useState<PushStatus>('idle');
   const [error, setError] = useState<string | undefined>();
   const [canUsePush, setCanUsePush] = useState(false);
+  const [vapidPublicKey, setVapidPublicKey] = useState<string>('');
+
+  // Récupérer la clé VAPID publique
+  useEffect(() => {
+    const fetchVapidKey = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('get-vapid-public-key');
+        
+        if (error) {
+          console.error('Erreur lors de la récupération de la clé VAPID:', error);
+          return;
+        }
+        
+        if (data?.vapid_public_key) {
+          setVapidPublicKey(data.vapid_public_key);
+        }
+      } catch (error) {
+        console.error('Erreur lors de la récupération de la clé VAPID:', error);
+      }
+    };
+
+    fetchVapidKey();
+  }, []);
 
   // Vérifier la compatibilité au montage
   useEffect(() => {
@@ -93,7 +113,7 @@ export function usePushSetup(options: UsePushSetupOptions = {}): UsePushSetupRet
       return;
     }
 
-    if (!VAPID_PUBLIC_KEY) {
+    if (!vapidPublicKey) {
       setError('Configuration VAPID manquante');
       setStatus('error');
       return;
@@ -140,7 +160,7 @@ export function usePushSetup(options: UsePushSetupOptions = {}): UsePushSetupRet
       }
 
       // Étape 4: S'abonner aux notifications push
-      const applicationServerKey = base64UrlToUint8Array(VAPID_PUBLIC_KEY);
+      const applicationServerKey = base64UrlToUint8Array(vapidPublicKey);
       
       const subscription = await Promise.race([
         registration.pushManager.subscribe({
@@ -190,7 +210,7 @@ export function usePushSetup(options: UsePushSetupOptions = {}): UsePushSetupRet
     } finally {
       clearTimeout(timeoutId);
     }
-  }, [canUsePush, timeout]);
+  }, [canUsePush, timeout, vapidPublicKey]);
 
   const unsubscribe = useCallback(async () => {
     try {
