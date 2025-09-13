@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { usePWA } from '@/hooks/usePWA';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { toast } from '@/hooks/use-toast';
 
 interface NotificationSetupProps {
@@ -19,16 +19,17 @@ interface NotificationSetupProps {
 
 export function NotificationSetup({ enabled, onToggle }: NotificationSetupProps) {
   const {
-    supportsNotifications,
-    notificationPermission,
-    requestNotificationPermission,
-    isStandalone
-  } = usePWA();
+    isSupported,
+    isSubscribed,
+    loading,
+    subscribe,
+    unsubscribe
+  } = usePushNotifications();
 
   const [isRequesting, setIsRequesting] = useState(false);
 
   const handleToggle = async (newEnabled: boolean) => {
-    if (!supportsNotifications) {
+    if (!isSupported) {
       toast({
         title: "Notifications non supportées",
         description: "Votre navigateur ne supporte pas les notifications.",
@@ -37,23 +38,26 @@ export function NotificationSetup({ enabled, onToggle }: NotificationSetupProps)
       return;
     }
 
-    if (newEnabled && notificationPermission !== 'granted') {
+    if (newEnabled && !isSubscribed) {
       setIsRequesting(true);
       try {
-        const granted = await requestNotificationPermission();
-        if (granted) {
+        const success = await subscribe();
+        if (success) {
           onToggle(true);
         }
       } finally {
         setIsRequesting(false);
       }
+    } else if (!newEnabled && isSubscribed) {
+      await unsubscribe();
+      onToggle(false);
     } else {
       onToggle(newEnabled);
     }
   };
 
   const getNotificationStatus = () => {
-    if (!supportsNotifications) {
+    if (!isSupported) {
       return {
         icon: AlertTriangle,
         title: "Notifications non supportées",
@@ -62,16 +66,7 @@ export function NotificationSetup({ enabled, onToggle }: NotificationSetupProps)
       };
     }
 
-    if (notificationPermission === 'denied') {
-      return {
-        icon: BellOff,
-        title: "Notifications bloquées",
-        description: "Les notifications ont été refusées. Vous pouvez les réactiver dans les paramètres de votre navigateur.",
-        variant: "destructive" as const,
-      };
-    }
-
-    if (notificationPermission === 'granted' && enabled) {
+    if (isSubscribed && enabled) {
       return {
         icon: Bell,
         title: "Notifications activées",
@@ -105,11 +100,11 @@ export function NotificationSetup({ enabled, onToggle }: NotificationSetupProps)
             </div>
           </div>
           
-          {supportsNotifications && notificationPermission !== 'denied' && (
+          {isSupported && (
             <Switch
-              checked={enabled && notificationPermission === 'granted'}
+              checked={enabled && isSubscribed}
               onCheckedChange={handleToggle}
-              disabled={isRequesting}
+              disabled={isRequesting || loading}
             />
           )}
         </div>
@@ -123,7 +118,7 @@ export function NotificationSetup({ enabled, onToggle }: NotificationSetupProps)
           </AlertDescription>
         </Alert>
 
-        {!isStandalone && notificationPermission === 'granted' && (
+        {isSubscribed && (
           <div className="mt-3 p-3 bg-primary/10 rounded-lg border border-primary/20">
             <p className="text-xs text-primary font-medium mb-1">
               💡 Conseil PWA
@@ -131,23 +126,6 @@ export function NotificationSetup({ enabled, onToggle }: NotificationSetupProps)
             <p className="text-xs text-muted-foreground">
               Installez l'app sur votre écran d'accueil pour recevoir les notifications même quand le navigateur est fermé.
             </p>
-          </div>
-        )}
-
-        {notificationPermission === 'denied' && (
-          <div className="mt-3">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                toast({
-                  title: "Réactivation des notifications",
-                  description: "Allez dans les paramètres de votre navigateur → Notifications → Autorisations pour réactiver les notifications pour ce site.",
-                });
-              }}
-            >
-              Comment réactiver ?
-            </Button>
           </div>
         )}
       </CardContent>

@@ -1,3 +1,4 @@
+// Timer refondu avec notifications push et fonctionnement en arrière-plan
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Play, Pause, RotateCcw, CheckCircle, Clock, Bell, BellOff, Shield } from "lucide-react";
