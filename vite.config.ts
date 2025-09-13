@@ -14,15 +14,12 @@ export default defineConfig(({ mode }) => ({
     react(),
     mode === 'development' && componentTagger(),
     VitePWA({
-      strategies: 'injectManifest',
-      srcDir: 'public',
-      filename: 'sw.js',
-      injectManifest: {
+      registerType: 'autoUpdate',
+      workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}']
       },
       devOptions: {
-        enabled: true,
-        type: 'module'
+        enabled: true
       }
     })
   ].filter(Boolean),
