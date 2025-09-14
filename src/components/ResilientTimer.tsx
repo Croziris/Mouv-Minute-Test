@@ -117,7 +117,7 @@ export function ResilientTimer({ onTimerEnd }: ResilientTimerProps) {
   return (
     <div className="space-y-6">
       {/* Sélecteur de durée */}
-      {!isRunning && remainingSec === durationMin * 60 && (
+      {!isRunning && remainingMs === durationMs && (
         <div className="space-y-4">
           <h3 className="font-heading text-lg text-center">Durée de la session</h3>
         </div>
@@ -188,7 +188,7 @@ export function ResilientTimer({ onTimerEnd }: ResilientTimerProps) {
             onClick={handleReset}
             variant="outline"
             size="lg"
-            disabled={remainingSec === durationMin * 60 && !isRunning}
+            disabled={remainingMs === durationMs && !isRunning}
           >
             <RotateCcw className="h-4 w-4 mr-2" />
             Reset
@@ -196,7 +196,7 @@ export function ResilientTimer({ onTimerEnd }: ResilientTimerProps) {
         </div>
 
         {/* Slider de durée */}
-        {!isRunning && remainingSec === durationMin * 60 && (
+        {!isRunning && remainingMs === durationMs && (
           <div className="w-80 px-4">
             <Slider
               value={[durationMin]}
@@ -215,7 +215,7 @@ export function ResilientTimer({ onTimerEnd }: ResilientTimerProps) {
         )}
 
         {/* Options avancées */}
-        {!isRunning && remainingSec === durationMin * 60 && (
+        {!isRunning && remainingMs === durationMs && (
           <div className="mt-6 pt-4 border-t space-y-4 w-80">
             <h4 className="text-sm font-medium text-muted-foreground text-center">Options avancées</h4>
             
