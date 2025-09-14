@@ -431,7 +431,7 @@ function TimerComponent() {
             <CardContent>
               <div className="grid gap-4 md:grid-cols-2">
                 {programs.map((program) => (
-                  <Card key={program.id} className="border-accent/20 hover:border-accent/40 transition-colors cursor-pointer" onClick={() => launchProgram(program.id)}>
+                  <Card key={program.id} className="border-accent/20 hover:border-accent/40 transition-colors cursor-pointer" onClick={() => navigate(`/session/${program.id}`)}>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base font-heading">{program.title}</CardTitle>
                       {program.description && (
