@@ -460,6 +460,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_stats: {
+        Row: {
+          completed_at: string
+          created_at: string
+          duration_ms: number | null
+          id: string
+          notes: string | null
+          program_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string
+          created_at?: string
+          duration_ms?: number | null
+          id?: string
+          notes?: string | null
+          program_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string
+          created_at?: string
+          duration_ms?: number | null
+          id?: string
+          notes?: string | null
+          program_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

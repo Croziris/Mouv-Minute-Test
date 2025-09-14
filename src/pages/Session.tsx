@@ -114,10 +114,25 @@ export default function Session() {
   };
 
   const handleFinishSession = async () => {
-    if (!user) return;
+    if (!user || !programId) return;
 
     try {
-      // Créer une session pour cette séance
+      // Calculer la durée totale des exercices en millisecondes
+      const totalDurationMs = exercises.reduce((sum, ex) => sum + ex.duration_sec * 1000, 0);
+
+      // Enregistrer la statistique utilisateur
+      const { error: statsError } = await supabase
+        .from('user_stats')
+        .insert({
+          user_id: user.id,
+          program_id: programId,
+          completed_at: new Date().toISOString(),
+          duration_ms: totalDurationMs,
+        });
+
+      if (statsError) throw statsError;
+
+      // Créer une session pour cette séance (optionnel, pour compatibilité)
       const { data: session, error } = await supabase
         .from('sessions')
         .insert([{
@@ -145,9 +160,10 @@ export default function Session() {
 
       toast({
         title: "Séance terminée !",
-        description: "Votre séance a été enregistrée avec succès.",
+        description: `Votre séance "${program?.title}" a été enregistrée avec succès.`,
       });
 
+      // Rediriger vers la page de sélection des programmes
       navigate('/timer');
     } catch (error) {
       console.error('Error finishing session:', error);
