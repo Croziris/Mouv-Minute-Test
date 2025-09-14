@@ -13,7 +13,7 @@ interface ResilientTimerProps {
 }
 
 const MIN_DURATION = 5; // minutes
-const MAX_DURATION = 90; // minutes
+const MAX_DURATION = 60; // minutes
 const STEP_DURATION = 5; // minutes
 
 export function ResilientTimer({ onTimerEnd }: ResilientTimerProps) {
