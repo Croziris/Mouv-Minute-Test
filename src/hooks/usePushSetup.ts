@@ -5,8 +5,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { base64UrlToUint8Array, getVapidPublicKey } from '@/utils/vapidUtils';
 import { toast } from '@/hooks/use-toast';
+import { base64UrlToUint8Array } from '@/utils/pushUtils';
 
 type PushStatus = 'idle' | 'prompting' | 'subscribing' | 'subscribed' | 'error';
 

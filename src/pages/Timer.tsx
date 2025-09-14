@@ -9,7 +9,7 @@ import { Layout } from "@/components/layout/Layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useResilientTimer } from "@/hooks/useResilientTimer";
+import { BasicTimer } from "@/components/BasicTimer";
 import { PushNotificationButton } from "@/components/PushNotificationButton";
 import { usePushSetup } from "@/hooks/usePushSetup";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -70,49 +70,13 @@ function TimerComponent() {
   const [breakExercises, setBreakExercises] = useState<Exercise[]>([]);
   const [completedExercises, setCompletedExercises] = useState<string[]>([]);
   const [programs, setPrograms] = useState<Program[]>([]);
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
   // Hook pour les notifications push
   const pushSetup = usePushSetup();
 
   // État des notifications pour cette session
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
-
-  // Fonction pour gérer la fin du timer
-  const handleTimerEnd = async () => {
-    setState('break');
-    
-    // Récupérer des exercices pour la pause
-    const exercises = await getRandomExercises();
-    setBreakExercises(exercises);
-    setCompletedExercises([]);
-
-    // Notification locale simple
-    if (typeof window !== 'undefined' && notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
-      try {
-        new Notification('Session terminée 🎉', {
-          body: 'Il est temps de faire tes exercices.',
-          icon: '/icon-192.png'
-        });
-      } catch (error) {
-        if (process.env.NODE_ENV !== 'production') {
-          console.warn('Notification failed:', error);
-        }
-      }
-    }
-  };
-
-  // Hook timer résilient
-  const timer = useResilientTimer({
-    onTimeUp: handleTimerEnd,
-    onStateChange: (timerState) => {
-      if (timerState.isRunning) {
-        setState('running');
-      } else if (state === 'running') {
-        setState('stopped');
-      }
-    }
-  });
 
   // Charger les programmes disponibles
   useEffect(() => {
@@ -169,10 +133,13 @@ function TimerComponent() {
 
       if (error) throw error;
 
-      setCurrentSessionId(session.id);
-      
-      // Démarrer le timer résilient avec l'ID de session
-      await timer.start(durationMinutes * 60 * 1000, session.id);
+      setSessionId(session.id);
+      setState('running');
+
+      toast({
+        title: "Session démarrée",
+        description: `Timer lancé pour ${durationMinutes} minutes.`,
+      });
 
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') {
@@ -186,13 +153,34 @@ function TimerComponent() {
     }
   };
 
+  const handleTimerEnd = async () => {
+    setState('break');
+    
+    // Récupérer des exercices pour la pause
+    const exercises = await getRandomExercises();
+    setBreakExercises(exercises);
+    setCompletedExercises([]);
 
-  const resetSession = async () => {
-    await timer.stop();
+    // Notification locale simple
+    if (typeof window !== 'undefined' && notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
+      try {
+        new Notification('Session terminée 🎉', {
+          body: 'Il est temps de faire tes exercices.',
+          icon: '/icon-192.png'
+        });
+      } catch (error) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('Notification failed:', error);
+        }
+      }
+    }
+  };
+
+  const resetSession = () => {
     setState('stopped');
     setBreakExercises([]);
     setCompletedExercises([]);
-    setCurrentSessionId(null);
+    setSessionId(null);
   };
 
   const markExerciseCompleted = (exerciseId: string) => {
@@ -200,12 +188,9 @@ function TimerComponent() {
   };
 
   const completeSession = async () => {
-    if (!currentSessionId) return;
+    if (!sessionId) return;
 
     try {
-      // Arrêter le timer
-      await timer.stop();
-      
       // Marquer la session comme terminée
       await supabase
         .from('sessions')
@@ -213,11 +198,11 @@ function TimerComponent() {
           completed: true,
           ended_at: new Date().toISOString()
         })
-        .eq('id', currentSessionId);
+        .eq('id', sessionId);
 
       // Enregistrer les exercices complétés
       const exerciseRecords = completedExercises.map(exerciseId => ({
-        session_id: currentSessionId,
+        session_id: sessionId,
         exercise_id: exerciseId,
         completed: true
       }));
@@ -233,7 +218,7 @@ function TimerComponent() {
         description: `Félicitations ! Vous avez terminé ${completedExercises.length} exercices.`,
       });
 
-      await resetSession();
+      resetSession();
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') {
         console.error('Erreur lors de la finalisation:', error);
@@ -410,85 +395,7 @@ function TimerComponent() {
                 </div>
               </Callout>
             ) : (
-              <div className="space-y-6">
-                {/* Affichage du timer */}
-                <div className="text-center space-y-4">
-                  <div className="text-6xl font-mono font-bold text-primary">
-                    {timer.formatTime(timer.remainingMs)}
-                  </div>
-                  
-                  {/* Barre de progression */}
-                  <div className="w-full bg-muted/20 rounded-full h-2">
-                    <div 
-                      className="bg-primary h-2 rounded-full transition-all duration-500"
-                      style={{ width: `${timer.progress}%` }}
-                    />
-                  </div>
-
-                  {/* Contrôles du timer */}
-                  <div className="flex justify-center gap-4">
-                    {!timer.isRunning ? (
-                      <div className="space-y-4">
-                        {/* Sélecteur de durée */}
-                        <div className="flex justify-center gap-2">
-                          <Button
-                            variant="outline"
-                            onClick={() => timer.setDuration(15 * 60 * 1000)}
-                            disabled={timer.isRunning}
-                            size="sm"
-                          >
-                            15 min
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onClick={() => timer.setDuration(25 * 60 * 1000)}
-                            disabled={timer.isRunning}
-                            size="sm"
-                          >
-                            25 min
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onClick={() => timer.setDuration(45 * 60 * 1000)}
-                            disabled={timer.isRunning}
-                            size="sm"
-                          >
-                            45 min
-                          </Button>
-                        </div>
-                        
-                        <Button
-                          onClick={() => startSession(Math.round(timer.durationMs / 60000))}
-                          size="lg"
-                          className="font-semibold px-8"
-                        >
-                          Démarrer
-                        </Button>
-                      </div>
-                    ) : (
-                      <Button
-                        onClick={resetSession}
-                        variant="destructive"
-                        size="lg"
-                        className="font-semibold px-8"
-                      >
-                        Arrêter
-                      </Button>
-                    )}
-                  </div>
-
-                  {/* Statut */}
-                  <div className="text-sm text-muted-foreground">
-                    {timer.isRunning ? (
-                      <span className="text-success">En cours...</span>
-                    ) : timer.remainingMs > 0 ? (
-                      <span className="text-warning">En pause</span>
-                    ) : (
-                      <span>Prêt à démarrer</span>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <BasicTimer onTimerEnd={handleTimerEnd} />
             )}
           </CardContent>
         </Card>
