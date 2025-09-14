@@ -472,7 +472,7 @@ export default function Timer() {
                       <div>
                         <p className="text-sm font-medium">Notifications de rappel</p>
                         <p className="text-xs text-muted-foreground">
-                          Recevoir des alertes à la fin des sessions
+                          Recevoir des alertes à la fin des sessions, optimisé seulement sur PC.
                         </p>
                       </div>
                     </div>
