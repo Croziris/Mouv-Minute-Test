@@ -9,7 +9,7 @@ import { Layout } from "@/components/layout/Layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { BasicTimer } from "@/components/BasicTimer";
+import { ResilientTimer } from "@/components/ResilientTimer";
 import { PushNotificationButton } from "@/components/PushNotificationButton";
 import { usePushSetup } from "@/hooks/usePushSetup";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -395,7 +395,7 @@ function TimerComponent() {
                 </div>
               </Callout>
             ) : (
-              <BasicTimer onTimerEnd={handleTimerEnd} />
+              <ResilientTimer onTimerEnd={handleTimerEnd} />
             )}
           </CardContent>
         </Card>
