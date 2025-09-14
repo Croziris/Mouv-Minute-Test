@@ -97,7 +97,7 @@ export function TimerWidget({ onTimerEnd }: TimerProps) {
               stroke="currentColor"
               strokeWidth="8"
               fill="none"
-              className="text-success transition-all duration-1000 ease-out"
+              className="text-primary transition-all duration-1000 ease-out"
               strokeDasharray={`${2 * Math.PI * 45}`}
               strokeDashoffset={`${2 * Math.PI * 45 * (1 - progress / 100)}`}
               strokeLinecap="round"
@@ -133,7 +133,6 @@ export function TimerWidget({ onTimerEnd }: TimerProps) {
               />
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>{MIN_DURATION} min</span>
-                <span className="font-medium">{durationMin} min</span>
                 <span>{MAX_DURATION} min</span>
               </div>
             </div>
