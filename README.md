@@ -1,175 +1,73 @@
-# Mouv'Minute PWA
+# Welcome to your Lovable project
 
-Une Progressive Web App pour gérer des sessions de travail avec des pauses actives et des exercices.
+## Project info
 
-## Fonctionnalités
+**URL**: https://lovable.dev/projects/a59fd989-1232-4653-b99d-49f19e8d996b
 
-- 🕒 Timer personnalisable pour sessions de travail
-- 💪 Exercices de pause active
-- 🔔 Notifications push pour rappels automatiques
-- 📱 Interface PWA installable
-- 👤 Authentification utilisateur
-- 📊 Suivi des sessions et exercices
+## How can I edit this code?
 
-## Configuration des Notifications Push
+There are several ways of editing your application.
 
-### Prérequis
+**Use Lovable**
 
-1. **Installation web-push** : `npm install -g web-push`
-2. **Génération clés VAPID** : `npx web-push generate-vapid-keys`
-3. **Configuration variables d'environnement**
+Simply visit the [Lovable Project](https://lovable.dev/projects/a59fd989-1232-4653-b99d-49f19e8d996b) and start prompting.
 
-### Configuration étape par étape
+Changes made via Lovable will be committed automatically to this repo.
 
-#### 1. Générer les clés VAPID
+**Use your preferred IDE**
 
-Exécutez cette commande pour générer une paire de clés :
+If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
 
-```bash
-npx web-push generate-vapid-keys
-```
+The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
-Vous obtiendrez quelque chose comme :
+Follow these steps:
 
-```
-=======================================
+```sh
+# Step 1: Clone the repository using the project's Git URL.
+git clone <YOUR_GIT_URL>
 
-Public Key:
-BH4dYirGhV-uuCLSmy9aALg9F8kFVgWqWJwJzK8ioxfQR1HzBdRYYXHrV-gPf5M6s_4eJ6oXVv2_b1r8f9JZjYM
+# Step 2: Navigate to the project directory.
+cd <YOUR_PROJECT_NAME>
 
-Private Key:
-vOVgDygVt8xHDiOBNH6oEVGQ3cGUMqGPFwkqLp6YrAs
+# Step 3: Install the necessary dependencies.
+npm i
 
-=======================================
-```
-
-#### 2. Configuration front-end (Lovable)
-
-Créez un fichier `.env` dans votre projet (copie de `.env.example`) :
-
-```env
-# Notifications Push - Clé publique VAPID
-# Copiez ici la PUBLIC KEY générée ci-dessus
-VITE_VAPID_PUBLIC_KEY=BH4dYirGhV-uuCLSmy9aALg9F8kFVgWqWJwJzK8ioxfQR1HzBdRYYXHrV-gPf5M6s_4eJ6oXVv2_b1r8f9JZjYM
-
-# Autres variables...
-VITE_ENABLE_TIMER=true
-```
-
-#### 3. Configuration serveur (Supabase)
-
-Dans votre tableau de bord Supabase, allez dans **Settings > Edge Functions** et ajoutez le secret :
-
-- **Nom** : `VAPID_PRIVATE_KEY`
-- **Valeur** : La clé privée générée (ex: `vOVgDygVt8xHDiOBNH6oEVGQ3cGUMqGPFwkqLp6YrAs`)
-
-⚠️ **IMPORTANT** : Les deux clés (publique et privée) doivent correspondre à la même paire !
-
-### Test de fonctionnement
-
-#### 1. Desktop (Chrome/Edge/Firefox)
-- ✅ Ouvrir l'application
-- ✅ Cliquer sur "Activer les notifications" 
-- ✅ Autoriser les notifications dans le navigateur
-- ✅ Vérifier que le statut passe à "Notifications activées"
-- ✅ Démarrer une session courte (1-2 min) pour tester
-
-#### 2. Android (Chrome)
-- ✅ Ouvrir l'application dans Chrome
-- ✅ Cliquer sur "Activer les notifications"
-- ✅ Autoriser les notifications
-- ✅ Vérifier qu'il n'y a pas de freeze
-- ✅ Tester avec une session courte
-
-#### 3. iOS (16.4+) - PWA uniquement
-- ✅ Ouvrir Safari
-- ✅ Installer l'app PWA (Partager > Ajouter à l'écran d'accueil)
-- ✅ Ouvrir l'app PWA installée
-- ✅ Les notifications doivent être disponibles
-- ⚠️ **Important** : Sur iOS, les notifications ne marchent QUE dans la PWA installée
-
-#### 4. Test de timeout
-- ✅ Désactiver la connexion réseau
-- ✅ Essayer d'activer les notifications
-- ✅ Vérifier que l'UI affiche "Timeout - Veuillez réessayer"
-- ✅ L'app ne doit pas freezer
-
-### Compatibilité
-
-| Plateforme | Support | Notes |
-|------------|---------|-------|
-| Chrome Desktop | ✅ | Support complet |
-| Firefox Desktop | ✅ | Support complet |
-| Safari Desktop | ⚠️ | Limité, nécessite interaction utilisateur |
-| Chrome Android | ✅ | Support complet |
-| Safari iOS 16.4+ | ✅ | PWA installée uniquement |
-| iOS < 16.4 | ❌ | Non supporté |
-
-### Dépannage
-
-#### "The provided applicationServerKey is not valid"
-- ✅ Vérifiez que `VITE_VAPID_PUBLIC_KEY` est bien définie dans `.env`
-- ✅ Vérifiez que la clé est bien au format Base64URL (sans espaces ni retours à la ligne)
-- ✅ Vérifiez que les clés publique/privée correspondent à la même paire
-- ✅ Redémarrez le serveur de développement après avoir modifié `.env`
-- ✅ Copiez exactement la clé publique générée par `npx web-push generate-vapid-keys`
-
-#### "Clé VAPID publique manquante"
-- ✅ Copiez `.env.example` vers `.env`
-- ✅ Ajoutez votre clé publique VAPID dans `.env`
-- ✅ Redémarrez `npm run dev`
-
-#### "Notifications non supportées"
-- Vérifiez que vous utilisez HTTPS (requis)
-- Sur iOS, assurez-vous que l'app est installée comme PWA
-- Vérifiez la version du navigateur
-
-#### "Timeout lors de l'activation"
-- Vérifiez votre connexion internet
-- Réessayez après quelques secondes
-- Vérifiez que les edge functions Supabase sont déployées
-
-#### "Permission refusée"
-- Allez dans les paramètres du navigateur
-- Réautorisez les notifications pour le site
-- Rechargez la page et réessayez
-
-### Architecture
-
-```
-src/
-├── hooks/
-│   └── usePushSetup.ts          # Hook principal pour les notifications
-├── components/
-│   └── PushNotificationButton.tsx # Interface utilisateur
-├── utils/
-│   └── pushUtils.ts             # Utilitaires (Base64URL, compatibilité)
-└── pages/
-    └── Timer.tsx                # Page principale avec integration
-
-supabase/functions/
-├── save-subscription/           # Sauvegarder les abonnements push
-├── delete-subscription/         # Supprimer les abonnements
-└── schedule-session-notification/ # Programmer les notifications
-
-public/
-└── sw.js                       # Service Worker avec gestion push
-```
-
-### Développement
-
-```bash
-# Installer les dépendances
-npm install
-
-# Démarrer en mode développement
+# Step 4: Start the development server with auto-reloading and an instant preview.
 npm run dev
-
-# Build de production
-npm run build
 ```
 
-Pour tester les notifications en développement :
-1. Utilisez HTTPS (localhost ne fonctionne que partiellement)
-2. Ouvrez les DevTools > Application > Service Workers
-3. Surveillez les logs du Service Worker dans la console
+**Edit a file directly in GitHub**
+
+- Navigate to the desired file(s).
+- Click the "Edit" button (pencil icon) at the top right of the file view.
+- Make your changes and commit the changes.
+
+**Use GitHub Codespaces**
+
+- Navigate to the main page of your repository.
+- Click on the "Code" button (green button) near the top right.
+- Select the "Codespaces" tab.
+- Click on "New codespace" to launch a new Codespace environment.
+- Edit files directly within the Codespace and commit and push your changes once you're done.
+
+## What technologies are used for this project?
+
+This project is built with:
+
+- Vite
+- TypeScript
+- React
+- shadcn-ui
+- Tailwind CSS
+
+## How can I deploy this project?
+
+Simply open [Lovable](https://lovable.dev/projects/a59fd989-1232-4653-b99d-49f19e8d996b) and click on Share -> Publish.
+
+## Can I connect a custom domain to my Lovable project?
+
+Yes, you can!
+
+To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+
+Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)

@@ -34,17 +34,7 @@ export function Header() {
       <div className="container mx-auto flex h-14 items-center justify-between px-4">
         {/* Logo / Titre cliquable */}
         <div className="flex items-center space-x-2">
-          <Link to="/" className="hover:opacity-80 transition-opacity flex items-center gap-2">
-            <img 
-              src="https://vblqvkqkmdmlcxxphwks.supabase.co/storage/v1/object/public/Icone%20autre/Logo%20app%20mouv'minute.png"
-              alt="Mouv'Minute" 
-              className="h-8 w-8 object-contain"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none';
-              }}
-              loading="lazy"
-              decoding="async"
-            />
+          <Link to="/" className="hover:opacity-80 transition-opacity">
             <h1 className="text-lg font-heading font-bold text-primary">
               Mouv'Minute
             </h1>
