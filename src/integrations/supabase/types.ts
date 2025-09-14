@@ -21,6 +21,7 @@ export type Database = {
           end_at: string
           id: string
           is_active: boolean | null
+          paused_remaining_ms: number | null
           session_id: string | null
           start_at: string
           updated_at: string | null
@@ -32,6 +33,7 @@ export type Database = {
           end_at: string
           id?: string
           is_active?: boolean | null
+          paused_remaining_ms?: number | null
           session_id?: string | null
           start_at?: string
           updated_at?: string | null
@@ -43,6 +45,7 @@ export type Database = {
           end_at?: string
           id?: string
           is_active?: boolean | null
+          paused_remaining_ms?: number | null
           session_id?: string | null
           start_at?: string
           updated_at?: string | null
@@ -469,6 +472,14 @@ export type Database = {
       has_role: {
         Args: { _role: string; _user_id: string }
         Returns: boolean
+      }
+      pause_timer: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      resume_timer: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
       start_timer: {
         Args: { duration_ms: number; session_id_param?: string }
