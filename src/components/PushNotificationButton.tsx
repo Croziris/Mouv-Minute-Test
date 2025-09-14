@@ -22,7 +22,8 @@ export function PushNotificationButton({ onStatusChange }: PushNotificationButto
     status,
     error,
     requestPermissionAndSubscribe,
-    unsubscribe
+    unsubscribe,
+    testCurrentDeviceNotification
   } = usePushSetup();
   
   const { user } = useAuth();
@@ -69,20 +70,14 @@ export function PushNotificationButton({ onStatusChange }: PushNotificationButto
     try {
       toast({
         title: "Test en cours...",
-        description: "Envoi de la notification de test.",
+        description: "Envoi de la notification de test sur cet appareil.",
       });
 
-      const { data, error } = await supabase.functions.invoke('test-push-notification', {
-        body: { user_id: user.id }
-      });
-
-      if (error) {
-        throw new Error(error.message);
-      }
+      const data = await testCurrentDeviceNotification();
 
       toast({
         title: "Test envoyé !",
-        description: `${data.sent_count} notification(s) de test envoyée(s).`,
+        description: `Notification de test envoyée sur ${data.device_type || 'cet appareil'}.`,
       });
 
     } catch (error) {
@@ -150,32 +145,33 @@ export function PushNotificationButton({ onStatusChange }: PushNotificationButto
           </p>
         </div>
         
-        <div className="flex gap-2">
-          <Button
-            onClick={handleToggle}
-            disabled={isDisabled}
-            variant={getButtonVariant()}
-            size="lg"
-            className="min-w-[140px]"
-          >
-            {getButtonContent()}
-          </Button>
-          
-          {status === 'subscribed' && (
-            <Button
-              onClick={handleTestNotification}
-              variant="outline"
-              size="lg"
-              className="min-w-[100px]"
-            >
-              <TestTube className="h-4 w-4 mr-2" />
-              Tester
-            </Button>
-          )}
-        </div>
+        <Button
+          onClick={handleToggle}
+          disabled={isDisabled}
+          variant={getButtonVariant()}
+          size="lg"
+          className="min-w-[140px]"
+        >
+          {getButtonContent()}
+        </Button>
       </div>
 
-      {/* Messages simples */}
+      {/* Bouton test positionné juste sous les notifications activées */}
+      {status === 'subscribed' && (
+        <div className="pl-4 border-l-2 border-muted">
+          <Button
+            onClick={handleTestNotification}
+            variant="outline"
+            size="sm"
+            className="w-full"
+          >
+            <TestTube className="h-4 w-4 mr-2" />
+            Tester notification sur cet appareil
+          </Button>
+        </div>
+      )}
+
+      {/* Messages d'état */}
       {status === 'subscribed' && (
         <Alert>
           <Shield className="h-4 w-4" />

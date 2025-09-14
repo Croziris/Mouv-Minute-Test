@@ -21,6 +21,7 @@ interface UsePushSetupReturn {
   requestPermissionAndSubscribe: () => Promise<void>;
   unsubscribe: () => Promise<void>;
   scheduleNotification: (endAt: Date, sessionId?: string) => Promise<void>;
+  testCurrentDeviceNotification: () => Promise<any>;
 }
 
 export function usePushSetup(options: UsePushSetupOptions = {}): UsePushSetupReturn {
@@ -277,13 +278,42 @@ export function usePushSetup(options: UsePushSetupOptions = {}): UsePushSetupRet
     }
   }, [status]);
 
+  const testCurrentDeviceNotification = useCallback(async () => {
+    if (status !== 'subscribed') {
+      throw new Error('Notifications non activées');
+    }
+
+    try {
+      const user = await supabase.auth.getUser();
+      if (!user.data.user) throw new Error('Utilisateur non connecté');
+
+      const subscriptionId = localStorage.getItem('push_subscription_id');
+      
+      const { data, error } = await supabase.functions.invoke('send-push-test-for-current-device', {
+        body: {
+          user_id: user.data.user.id,
+          subscription_id: subscriptionId,
+          user_agent: navigator.userAgent
+        }
+      });
+
+      if (error) throw error;
+
+      return data;
+    } catch (error) {
+      console.error('Erreur lors du test de notification:', error);
+      throw error;
+    }
+  }, [status]);
+
   return {
     canUsePush,
     status,
     error,
     requestPermissionAndSubscribe,
     unsubscribe,
-    scheduleNotification
+    scheduleNotification,
+    testCurrentDeviceNotification
   };
 }
 
@@ -293,6 +323,18 @@ async function saveSubscriptionToDatabase(subscription: PushSubscription) {
   const user = await supabase.auth.getUser();
   if (!user.data.user) throw new Error('Utilisateur non connecté');
 
+  // Détecter le type d'appareil
+  const userAgent = navigator.userAgent;
+  let deviceType = 'desktop';
+  if (/Android/i.test(userAgent)) {
+    deviceType = 'android';
+  } else if (/iPhone|iPad|iPod/i.test(userAgent)) {
+    deviceType = 'ios';
+  }
+
+  // Générer un ID unique pour cette souscription
+  const subscriptionId = `${deviceType}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
   const { error } = await supabase.functions.invoke('save-subscription', {
     body: {
       user_id: user.data.user.id,
@@ -300,11 +342,17 @@ async function saveSubscriptionToDatabase(subscription: PushSubscription) {
       p256dh: subscription.getKey('p256dh') ? 
         btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('p256dh')!))) : null,
       auth: subscription.getKey('auth') ? 
-        btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('auth')!))) : null
+        btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('auth')!))) : null,
+      device_type: deviceType,
+      user_agent: userAgent,
+      subscription_id: subscriptionId
     }
   });
 
   if (error) throw error;
+
+  // Sauvegarder l'ID de souscription localement pour les tests
+  localStorage.setItem('push_subscription_id', subscriptionId);
 }
 
 async function deleteSubscriptionFromDatabase(subscription: PushSubscription) {

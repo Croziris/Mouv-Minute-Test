@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      active_timers: {
+        Row: {
+          created_at: string | null
+          duration_ms: number
+          end_at: string
+          id: string
+          is_active: boolean | null
+          session_id: string | null
+          start_at: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          duration_ms: number
+          end_at: string
+          id?: string
+          is_active?: boolean | null
+          session_id?: string | null
+          start_at?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          duration_ms?: number
+          end_at?: string
+          id?: string
+          is_active?: boolean | null
+          session_id?: string | null
+          start_at?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "active_timers_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       articles: {
         Row: {
           content: string
@@ -252,28 +296,37 @@ export type Database = {
         Row: {
           auth: string
           created_at: string
+          device_type: string | null
           endpoint: string
           id: string
           p256dh: string
+          subscription_id: string | null
           updated_at: string
+          user_agent: string | null
           user_id: string
         }
         Insert: {
           auth: string
           created_at?: string
+          device_type?: string | null
           endpoint: string
           id?: string
           p256dh: string
+          subscription_id?: string | null
           updated_at?: string
+          user_agent?: string | null
           user_id: string
         }
         Update: {
           auth?: string
           created_at?: string
+          device_type?: string | null
           endpoint?: string
           id?: string
           p256dh?: string
+          subscription_id?: string | null
           updated_at?: string
+          user_agent?: string | null
           user_id?: string
         }
         Relationships: []
@@ -409,9 +462,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_active_timer: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       has_role: {
         Args: { _role: string; _user_id: string }
         Returns: boolean
+      }
+      start_timer: {
+        Args: { duration_ms: number; session_id_param?: string }
+        Returns: Json
+      }
+      stop_timer: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
     }
     Enums: {

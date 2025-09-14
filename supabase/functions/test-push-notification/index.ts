@@ -151,11 +151,11 @@ async function sendTestPushNotification(subscription: any) {
     'TTL': '60' // 1 minute de validité
   };
 
-  // Ajouter l'autorisation VAPID si disponible
+// Ajouter l'autorisation VAPID si disponible
   if (vapidPrivateKey && vapidPublicKey) {
-    // Simplification : on assume que l'endpoint Firebase/FCM accepte les payloads directement
-    // Dans un vrai système, il faudrait signer avec VAPID
-    headers['Authorization'] = `key=${vapidPrivateKey}`;
+    // Format VAPID correct pour WebPush
+    const vapidHeader = `vapid t=${generateJWTToken(vapidPrivateKey, vapidPublicKey, endpoint)}, k=${vapidPublicKey}`;
+    headers['Authorization'] = vapidHeader;
   }
 
   // Envoyer la notification

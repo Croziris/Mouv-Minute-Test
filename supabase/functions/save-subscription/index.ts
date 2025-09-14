@@ -19,7 +19,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { user_id, endpoint, p256dh, auth } = await req.json();
+    const { user_id, endpoint, p256dh, auth, device_type, user_agent, subscription_id } = await req.json();
 
     if (!user_id || !endpoint) {
       return new Response(
@@ -43,6 +43,9 @@ serve(async (req) => {
         .update({
           p256dh,
           auth,
+          device_type: device_type || 'desktop',
+          user_agent: user_agent || '',
+          subscription_id: subscription_id || '',
           updated_at: new Date().toISOString()
         })
         .eq('id', existingSub.id);
@@ -74,7 +77,10 @@ serve(async (req) => {
         user_id,
         endpoint,
         p256dh,
-        auth
+        auth,
+        device_type: device_type || 'desktop',
+        user_agent: user_agent || '',
+        subscription_id: subscription_id || ''
       })
       .select('id')
       .single();
