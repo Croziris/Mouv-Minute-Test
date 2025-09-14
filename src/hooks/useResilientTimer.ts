@@ -2,135 +2,104 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
-interface TimerState {
-  id?: string;
-  sessionId?: string;
-  startAt: Date | null;
-  endAt: Date | null;
+type TimerStatus = 'idle' | 'running' | 'paused' | 'finished';
+
+interface UseResilientTimer {
+  status: TimerStatus;
   durationMs: number;
-  isRunning: boolean;
-  serverNow: Date;
+  remainingMs: number;
+  endAt?: number; // epoch ms
+  start: (durationMs: number) => Promise<void>;
+  pause: () => Promise<void>;
+  resume: () => Promise<void>;
+  reset: () => Promise<void>;
+  refresh: () => Promise<void>; // recalcule depuis endAt / serveur
+  setDuration: (durationMs: number) => void; // ajout pour le slider
 }
 
-interface UseResilientTimerOptions {
-  onTimeUp?: () => void;
-  onStateChange?: (state: TimerState) => void;
+const STORAGE_KEY = 'resilient-timer-state';
+
+interface TimerState {
+  endAt?: number;
+  durationMs: number;
+  startedAt?: number;
+  status: TimerStatus;
 }
 
-export function useResilientTimer(options: UseResilientTimerOptions = {}) {
-  const { onTimeUp, onStateChange } = options;
-  
+export function useResilientTimer(): UseResilientTimer {
   const [state, setState] = useState<TimerState>({
-    startAt: null,
-    endAt: null,
     durationMs: 45 * 60 * 1000, // 45 minutes par défaut
-    isRunning: false,
-    serverNow: new Date()
+    status: 'idle'
   });
-
+  
   const [remainingMs, setRemainingMs] = useState(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const visibilityChangeTimeRef = useRef<number | null>(null);
 
-  // Calculer le temps restant basé sur l'échéance côté serveur
-  const calculateRemaining = useCallback((endAt: Date, serverNow: Date): number => {
-    const clientNow = new Date();
-    const serverOffset = clientNow.getTime() - serverNow.getTime();
-    const adjustedEndAt = new Date(endAt.getTime() + serverOffset);
-    
-    return Math.max(0, adjustedEndAt.getTime() - clientNow.getTime());
+  // Charger l'état depuis localStorage au montage
+  useEffect(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      try {
+        const parsedState = JSON.parse(stored) as TimerState;
+        setState(parsedState);
+        
+        if (parsedState.endAt && parsedState.status === 'running') {
+          const now = Date.now();
+          const remaining = Math.max(0, parsedState.endAt - now);
+          
+          if (remaining > 0) {
+            setRemainingMs(remaining);
+          } else {
+            // Timer expiré
+            setState(prev => ({ ...prev, status: 'finished' }));
+            setRemainingMs(0);
+          }
+        } else {
+          setRemainingMs(parsedState.status === 'idle' ? parsedState.durationMs : 0);
+        }
+      } catch (error) {
+        console.warn('Erreur lors du chargement du timer:', error);
+      }
+    } else {
+      setRemainingMs(state.durationMs);
+    }
   }, []);
 
-  // Récupérer l'état du timer depuis le serveur
-  const syncWithServer = useCallback(async () => {
-    try {
-      const { data, error } = await supabase.rpc('get_active_timer');
+  // Sauvegarder l'état dans localStorage
+  const saveState = useCallback((newState: TimerState) => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+  }, []);
+
+  // Calculer le temps restant
+  const updateRemaining = useCallback(() => {
+    if (state.status === 'running' && state.endAt) {
+      const now = Date.now();
+      const remaining = Math.max(0, state.endAt - now);
+      setRemainingMs(remaining);
       
-      if (error) {
-        console.error('Erreur lors de la synchronisation:', error);
-        return;
+      if (remaining === 0) {
+        setState(prev => {
+          const newState = { ...prev, status: 'finished' as TimerStatus };
+          saveState(newState);
+          return newState;
+        });
+        
+        toast({
+          title: "Session terminée !",
+          description: "Il est temps de faire tes exercices.",
+        });
       }
-
-      const timerData = data as any;
-
-      if (timerData?.active) {
-        const serverState = {
-          id: timerData.id,
-          sessionId: timerData.session_id,
-          startAt: new Date(timerData.start_at),
-          endAt: new Date(timerData.end_at),
-          durationMs: timerData.duration_ms,
-          isRunning: true,
-          serverNow: new Date(timerData.server_now)
-        };
-
-        setState(serverState);
-        
-        const remaining = calculateRemaining(serverState.endAt!, serverState.serverNow);
-        setRemainingMs(remaining);
-        
-        if (remaining <= 0) {
-          onTimeUp?.();
-        }
-      } else {
-        setState(prev => ({
-          ...prev,
-          startAt: null,
-          endAt: null,
-          isRunning: false,
-          serverNow: new Date(timerData?.server_now || new Date())
-        }));
-        setRemainingMs(0);
-        
-        if (timerData?.expired) {
-          onTimeUp?.();
-        }
-      }
-    } catch (error) {
-      console.error('Erreur de synchronisation serveur:', error);
+    } else if (state.status === 'idle') {
+      setRemainingMs(state.durationMs);
+    } else if (state.status === 'finished') {
+      setRemainingMs(0);
     }
-  }, [calculateRemaining, onTimeUp]);
+  }, [state.status, state.endAt, state.durationMs, saveState]);
 
-  // Synchroniser au montage et à chaque reprise de focus
+  // Interval pour mettre à jour le temps restant
   useEffect(() => {
-    syncWithServer();
-  }, [syncWithServer]);
-
-  // Gestion de la visibilité de la page pour économiser la batterie
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        // Page cachée - noter le moment
-        visibilityChangeTimeRef.current = Date.now();
-        
-        // Arrêter le timer visuel pour économiser la batterie
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-          intervalRef.current = null;
-        }
-      } else {
-        // Page visible - resynchroniser avec le serveur
-        visibilityChangeTimeRef.current = null;
-        syncWithServer();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [syncWithServer]);
-
-  // Timer visuel (uniquement quand visible)
-  useEffect(() => {
-    if (state.isRunning && state.endAt && !document.hidden) {
-      intervalRef.current = setInterval(() => {
-        const remaining = calculateRemaining(state.endAt!, state.serverNow);
-        setRemainingMs(remaining);
-
-        if (remaining <= 0) {
-          setState(prev => ({ ...prev, isRunning: false }));
-          onTimeUp?.();
-        }
-      }, 500); // 500ms pour la fluidité
+    if (state.status === 'running' && !document.hidden) {
+      intervalRef.current = setInterval(updateRemaining, 500);
     } else {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -144,119 +113,187 @@ export function useResilientTimer(options: UseResilientTimerOptions = {}) {
         intervalRef.current = null;
       }
     };
-  }, [state.isRunning, state.endAt, state.serverNow, calculateRemaining, onTimeUp]);
+  }, [state.status, updateRemaining]);
 
-  // Notifier les changements d'état
+  // Gérer la visibilité de la page
   useEffect(() => {
-    onStateChange?.(state);
-  }, [state, onStateChange]);
+    const handleVisibilityChange = () => {
+      if (!document.hidden && state.status === 'running') {
+        // Page redevient visible, recalculer
+        updateRemaining();
+      }
+    };
 
-  // Fonctions de contrôle
-  const start = useCallback(async (durationMs?: number, sessionId?: string) => {
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [state.status, updateRemaining]);
+
+  // Synchroniser avec le serveur si disponible
+  const syncWithServer = useCallback(async () => {
     try {
-      const { data, error } = await supabase.rpc('start_timer', {
-        duration_ms: durationMs || state.durationMs,
-        session_id_param: sessionId
-      });
-
-      if (error) throw error;
+      const { data, error } = await supabase.rpc('get_active_timer');
+      
+      if (error) {
+        console.warn('Erreur de synchronisation serveur:', error);
+        return;
+      }
 
       const timerData = data as any;
 
-      const newState = {
-        id: timerData.id,
-        sessionId: sessionId,
-        startAt: new Date(timerData.start_at),
-        endAt: new Date(timerData.end_at),
-        durationMs: timerData.duration_ms,
-        isRunning: true,
-        serverNow: new Date(timerData.server_now)
-      };
-
-      setState(newState);
-      setRemainingMs(timerData.duration_ms);
-
-      toast({
-        title: "Timer démarré",
-        description: `Session de ${Math.round(timerData.duration_ms / 60000)} minutes commencée.`,
-      });
-
+      if (timerData?.active && state.status === 'running') {
+        // Vérifier si le serveur et le client sont synchronisés
+        const serverEndAt = new Date(timerData.end_at).getTime();
+        const clientEndAt = state.endAt;
+        
+        // Si différence > 5 secondes, utiliser l'heure serveur
+        if (clientEndAt && Math.abs(serverEndAt - clientEndAt) > 5000) {
+          const newState = {
+            ...state,
+            endAt: serverEndAt
+          };
+          setState(newState);
+          saveState(newState);
+        }
+      }
     } catch (error) {
-      console.error('Erreur lors du démarrage du timer:', error);
-      toast({
-        title: "Erreur",
-        description: "Impossible de démarrer le timer.",
-        variant: "destructive",
-      });
+      console.warn('Erreur de synchronisation:', error);
     }
-  }, [state.durationMs]);
+  }, [state, saveState]);
 
-  const stop = useCallback(async () => {
-    try {
-      const { data, error } = await supabase.rpc('stop_timer');
-
-      if (error) throw error;
-
-      const timerData = data as any;
-
-      setState(prev => ({
-        ...prev,
-        startAt: null,
-        endAt: null,
-        isRunning: false,
-        serverNow: new Date(timerData?.server_now || new Date())
-      }));
-      setRemainingMs(0);
-
-      toast({
-        title: "Timer arrêté",
-        description: "La session a été interrompue.",
-      });
-
-    } catch (error) {
-      console.error('Erreur lors de l\'arrêt du timer:', error);
-      toast({
-        title: "Erreur",
-        description: "Impossible d'arrêter le timer.",
-        variant: "destructive",
-      });
-    }
-  }, []);
-
-  const setDuration = useCallback((durationMs: number) => {
-    if (state.isRunning) {
-      console.warn('Impossible de changer la durée pendant que le timer fonctionne');
-      return;
-    }
+  const start = useCallback(async (durationMs: number) => {
+    const now = Date.now();
+    const endAt = now + durationMs;
     
-    setState(prev => ({ ...prev, durationMs }));
+    const newState: TimerState = {
+      durationMs,
+      endAt,
+      startedAt: now,
+      status: 'running'
+    };
+
+    setState(newState);
+    saveState(newState);
     setRemainingMs(durationMs);
-  }, [state.isRunning]);
+
+    // Tenter de synchroniser avec le serveur
+    try {
+      await supabase.rpc('start_timer', {
+        duration_ms: durationMs
+      });
+    } catch (error) {
+      console.warn('Erreur serveur lors du démarrage:', error);
+      // Continuer en mode local
+    }
+
+    toast({
+      title: "Timer démarré",
+      description: `Session de ${Math.round(durationMs / 60000)} minutes commencée.`,
+    });
+  }, [saveState]);
+
+  const pause = useCallback(async () => {
+    if (state.status !== 'running') return;
+
+    const newState: TimerState = {
+      ...state,
+      status: 'paused'
+    };
+
+    setState(newState);
+    saveState(newState);
+
+    try {
+      await supabase.rpc('pause_timer');
+    } catch (error) {
+      console.warn('Erreur serveur lors de la pause:', error);
+    }
+
+    toast({
+      title: "Timer en pause",
+      description: "Session mise en pause.",
+    });
+  }, [state, saveState]);
+
+  const resume = useCallback(async () => {
+    if (state.status !== 'paused' || !state.endAt) return;
+
+    // Recalculer l'échéance basée sur le temps restant
+    const now = Date.now();
+    const newEndAt = now + remainingMs;
+    
+    const newState: TimerState = {
+      ...state,
+      endAt: newEndAt,
+      status: 'running'
+    };
+
+    setState(newState);
+    saveState(newState);
+
+    try {
+      await supabase.rpc('resume_timer');
+    } catch (error) {
+      console.warn('Erreur serveur lors de la reprise:', error);
+    }
+
+    toast({
+      title: "Timer repris",
+      description: "Session reprise.",
+    });
+  }, [state, remainingMs, saveState]);
+
+  const reset = useCallback(async () => {
+    const newState: TimerState = {
+      durationMs: state.durationMs,
+      status: 'idle'
+    };
+
+    setState(newState);
+    saveState(newState);
+    setRemainingMs(state.durationMs);
+
+    try {
+      await supabase.rpc('stop_timer');
+    } catch (error) {
+      console.warn('Erreur serveur lors de l\'arrêt:', error);
+    }
+
+    localStorage.removeItem(STORAGE_KEY);
+  }, [state.durationMs, saveState]);
+
+  const refresh = useCallback(async () => {
+    await syncWithServer();
+    updateRemaining();
+  }, [syncWithServer, updateRemaining]);
+
+  // Mise à jour initiale du temps restant
+  useEffect(() => {
+    updateRemaining();
+  }, [updateRemaining]);
+
+  const setDuration = useCallback((newDurationMs: number) => {
+    if (state.status !== 'idle') return;
+    
+    const newState: TimerState = {
+      ...state,
+      durationMs: newDurationMs
+    };
+    
+    setState(newState);
+    saveState(newState);
+    setRemainingMs(newDurationMs);
+  }, [state, saveState]);
 
   return {
-    // État
-    remainingMs,
-    isRunning: state.isRunning,
+    status: state.status,
     durationMs: state.durationMs,
+    remainingMs,
     endAt: state.endAt,
-    sessionId: state.sessionId,
-    serverId: state.id,
-    
-    // Actions
     start,
-    stop,
-    setDuration,
-    syncWithServer,
-    
-    // Utilitaires
-    formatTime: (ms: number) => {
-      if (isNaN(ms) || ms < 0) return '00:00';
-      const totalSeconds = Math.ceil(ms / 1000);
-      const minutes = Math.floor(totalSeconds / 60);
-      const seconds = totalSeconds % 60;
-      return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    },
-    
-    progress: state.durationMs > 0 ? ((state.durationMs - remainingMs) / state.durationMs) * 100 : 0
+    pause,
+    resume,
+    reset,
+    refresh,
+    setDuration
   };
 }
