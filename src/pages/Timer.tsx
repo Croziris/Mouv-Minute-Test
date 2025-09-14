@@ -451,7 +451,7 @@ export default function Timer() {
                   <div>
                     <p className="text-sm font-medium">Durée recommandée</p>
                     <p className="text-xs text-muted-foreground">
-                      45 minutes de travail, puis 3 minutes d'exercices
+                      30 à 45 minutes de travail, puis 5 minutes d'exercices
                     </p>
                   </div>
                 </div>
