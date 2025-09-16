@@ -20,6 +20,8 @@ interface Exercise {
   description_public: string;
   duration_sec: number;
   zone: string;
+  media_primary: string | null;
+  notes_kine: string | null;
 }
 
 interface Program {
@@ -80,7 +82,7 @@ export default function Timer() {
   const getRandomExercises = async () => {
     const { data: allExercises } = await supabase
       .from('exercises')
-      .select('*')
+      .select('id, title, description_public, duration_sec, zone, media_primary, notes_kine')
       .limit(20);
 
     if (allExercises && allExercises.length > 0) {
@@ -295,7 +297,9 @@ export default function Timer() {
             title,
             description_public,
             duration_sec,
-            zone
+            zone,
+            media_primary,
+            notes_kine
           )
         `)
         .eq('program_id', programId)
@@ -574,10 +578,40 @@ export default function Timer() {
                         )}
                       </div>
                     </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        {exercise.description_public}
-                      </p>
+                    <CardContent className="space-y-4">
+                      {exercise.media_primary && (
+                        <div>
+                          <video
+                            src={exercise.media_primary}
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                            className="w-full rounded-lg"
+                            style={{ maxHeight: '300px' }}
+                          >
+                            Votre navigateur ne supporte pas la lecture vidéo.
+                          </video>
+                        </div>
+                      )}
+                      
+                      <div className="grid gap-4">
+                        <div>
+                          <h4 className="font-medium mb-2">Description</h4>
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            {exercise.description_public}
+                          </p>
+                        </div>
+                        
+                        {exercise.notes_kine && (
+                          <div>
+                            <h4 className="font-medium mb-2">💡 Tips kiné</h4>
+                            <p className="text-sm text-muted-foreground leading-relaxed">
+                              {exercise.notes_kine}
+                            </p>
+                          </div>
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
                 ))}

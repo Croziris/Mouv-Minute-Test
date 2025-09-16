@@ -282,6 +282,10 @@ export default function Session() {
                     <h4 className="font-medium mb-2">Vidéo de démonstration</h4>
                     <video
                       src={currentEx.media_primary}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
                       controls
                       className="w-full rounded-lg"
                       preload="metadata"
