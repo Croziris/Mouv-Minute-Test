@@ -288,7 +288,8 @@ export default function Session() {
                       muted
                       playsInline
                       controls
-                      className="w-full rounded-lg"
+                      className="w-full max-w-md mx-auto rounded-lg"
+                      style={{ maxHeight: '300px' }}
                       preload="metadata"
                     >
                       Votre navigateur ne supporte pas la lecture vidéo.
