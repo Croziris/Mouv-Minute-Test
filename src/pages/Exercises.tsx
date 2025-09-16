@@ -7,6 +7,8 @@ import { Layout } from "@/components/layout/Layout";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { ExerciseTimer } from "@/components/ExerciseTimer";
+import { toast } from "@/hooks/use-toast";
 
 interface Exercise {
   id: string;
@@ -186,10 +188,21 @@ export default function Exercises() {
                         </div>
                       </CardHeader>
 
-                      <CardContent>
+                      <CardContent className="space-y-3">
                         <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed">
                           {exercise.description_public}
                         </p>
+                        
+                        {/* Timer pour l'exercice */}
+                        <ExerciseTimer
+                          durationSec={exercise.duration_sec}
+                          onComplete={() => {
+                            toast({
+                              title: "Timer terminé !",
+                              description: `Temps d'exercice écoulé pour ${exercise.title}`,
+                            });
+                          }}
+                        />
                       </CardContent>
                     </Card>
                   ))}

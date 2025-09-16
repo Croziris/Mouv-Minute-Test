@@ -8,6 +8,7 @@ import { Layout } from "@/components/layout/Layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { ExerciseTimer } from "@/components/ExerciseTimer";
 
 interface Exercise {
   id: string;
@@ -294,6 +295,19 @@ export default function Session() {
                     </video>
                   </div>
                 )}
+                
+                {/* Timer pour l'exercice */}
+                <div className="mt-4">
+                  <ExerciseTimer
+                    durationSec={currentEx.duration_sec}
+                    onComplete={() => {
+                      toast({
+                        title: "Timer terminé !",
+                        description: `Temps d'exercice écoulé pour ${currentEx.title}`,
+                      });
+                    }}
+                  />
+                </div>
               </CardContent>
             </Card>
           )}

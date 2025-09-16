@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { usePWA } from "@/hooks/usePWA";
+import { ExerciseTimer } from "@/components/ExerciseTimer";
 
 type TimerState = 'stopped' | 'running' | 'paused' | 'break';
 
@@ -611,6 +612,19 @@ export default function Timer() {
                             </p>
                           </div>
                         )}
+                      </div>
+                      
+                      {/* Timer pour l'exercice */}
+                      <div className="mt-4">
+                        <ExerciseTimer
+                          durationSec={exercise.duration_sec}
+                          onComplete={() => {
+                            toast({
+                              title: "Timer terminé !",
+                              description: `Temps d'exercice écoulé pour ${exercise.title}`,
+                            });
+                          }}
+                        />
                       </div>
                     </CardContent>
                   </Card>
