@@ -10,13 +10,13 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/icon-192.png",
+      "src": "https://storage.googleapis.com/gpt-engineer-file-uploads/3ui3tQZhwnRq3geG5ea8cbS2Pf32/uploads/1758102737279-Logo app mouv'minute.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable any"
     },
     {
-      "src": "/icon-512.png",
+      "src": "https://storage.googleapis.com/gpt-engineer-file-uploads/3ui3tQZhwnRq3geG5ea8cbS2Pf32/uploads/1758102737279-Logo app mouv'minute.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable any"
