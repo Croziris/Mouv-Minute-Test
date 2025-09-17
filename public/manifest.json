@@ -30,14 +30,14 @@
       "short_name": "Session",
       "description": "Lancer une session de travail avec rappels d'exercices",
       "url": "/timer",
-      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "https://storage.googleapis.com/gpt-engineer-file-uploads/3ui3tQZhwnRq3geG5ea8cbS2Pf32/uploads/1758102737279-Logo app mouv'minute.png", "sizes": "192x192" }]
     },
     {
       "name": "Exercices",
       "short_name": "Exercices",
       "description": "Parcourir les exercices disponibles",
       "url": "/exercises",
-      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "https://storage.googleapis.com/gpt-engineer-file-uploads/3ui3tQZhwnRq3geG5ea8cbS2Pf32/uploads/1758102737279-Logo app mouv'minute.png", "sizes": "192x192" }]
     }
   ]
 }

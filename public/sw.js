@@ -90,7 +90,7 @@ self.addEventListener('fetch', (event) => {
         .catch(() => {
           // Fallback pour les images
           if (request.destination === 'image') {
-            return caches.match('/icon-192.png');
+            return caches.match('https://storage.googleapis.com/gpt-engineer-file-uploads/3ui3tQZhwnRq3geG5ea8cbS2Pf32/uploads/1758102737279-Logo app mouv'minute.png');
           }
         })
     );
