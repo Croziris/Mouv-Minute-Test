@@ -414,7 +414,7 @@ export default function Timer() {
                   </div>
                 )}
 
-                <Progress value={progress} className="mb-6" />
+                
 
                 <div className="flex gap-4 justify-center">
                   <Button
