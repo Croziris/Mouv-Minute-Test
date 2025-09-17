@@ -104,8 +104,7 @@ export function PWAInstallDialog() {
                 <p className="text-xs text-muted-foreground">Recevez des rappels pour vos pauses</p>
               </div>
             </div>
-            
-           
+          </div>
 
           {/* Instructions spécifiques au navigateur/OS */}
           {!canInstall && (
