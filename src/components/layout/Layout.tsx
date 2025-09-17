@@ -1,6 +1,7 @@
 import { Header } from "./Header";
 import { BottomNav } from "./BottomNav";
 import { PWAInstallBanner } from "@/components/PWAInstallBanner";
+import { PWAInstallDialog } from "@/components/PWAInstallDialog";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -29,8 +30,9 @@ export function Layout({ children, showBottomNav = true }: LayoutProps) {
       
       {showBottomNav && <BottomNav />}
       
-      {/* Bannière d'installation PWA */}
+      {/* Installation PWA */}
       <PWAInstallBanner />
+      <PWAInstallDialog />
     </div>
   );
 }
