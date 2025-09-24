@@ -165,6 +165,34 @@ export default function Session() {
     setCompletedExercises([]);
   };
 
+  // Vérifier si l'utilisateur est connecté
+  if (!user) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-6">
+          <div className="max-w-2xl mx-auto text-center space-y-6">
+            <div className="p-8 bg-muted/30 rounded-lg border">
+              <h1 className="text-2xl font-heading font-bold mb-4 text-primary">
+                Contenu réservé aux utilisateurs connectés
+              </h1>
+              <p className="text-muted-foreground mb-6 leading-relaxed">
+                Pour accéder aux séances d'exercices personnalisées, vous devez vous connecter à votre compte.
+                Rejoignez notre communauté pour bénéficier de programmes adaptés à vos besoins.
+              </p>
+              <Button 
+                onClick={() => navigate('/auth')} 
+                size="lg"
+                className="bg-primary hover:bg-primary-dark text-primary-foreground"
+              >
+                Se connecter
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
   if (loading) {
     return (
       <Layout>
