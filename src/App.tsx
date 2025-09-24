@@ -19,30 +19,32 @@ import Session from "./pages/Session";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
+const App = () => {
+  return (
+    <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/timer" element={<Timer />} />
-            <Route path="/session/:programId" element={<Session />} />
-            <Route path="/exercises" element={<Exercises />} />
-            <Route path="/exercises/:id" element={<ExerciseDetail />} />
-            <Route path="/article/:id" element={<ArticleDetail />} />
-            <Route path="/archives-conseils" element={<ArchivesConseils />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/auth" element={<Auth />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
+        <TooltipProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/timer" element={<Timer />} />
+              <Route path="/session/:programId" element={<Session />} />
+              <Route path="/exercises" element={<Exercises />} />
+              <Route path="/exercises/:id" element={<ExerciseDetail />} />
+              <Route path="/article/:id" element={<ArticleDetail />} />
+              <Route path="/archives-conseils" element={<ArchivesConseils />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/auth" element={<Auth />} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+          <Toaster />
+          <Sonner />
+        </TooltipProvider>
       </AuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+    </QueryClientProvider>
+  );
+};
 
 export default App;
