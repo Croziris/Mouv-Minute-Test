@@ -295,6 +295,39 @@ export type Database = {
         }
         Relationships: []
       }
+      push_notification_queue: {
+        Row: {
+          attempts: number
+          created_at: string
+          error_message: string | null
+          id: string
+          notification_data: Json
+          sent_at: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          notification_data: Json
+          sent_at?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          notification_data?: Json
+          sent_at?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       push_subscriptions: {
         Row: {
           auth: string
@@ -498,6 +531,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      dispatch_due_notifications: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       get_active_timer: {
         Args: Record<PropertyKey, never>
         Returns: Json

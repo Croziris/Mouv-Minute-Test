@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { usePWA } from "@/hooks/usePWA";
 import { ExerciseTimer } from "@/components/ExerciseTimer";
+import { useResilientTimer } from "@/hooks/useResilientTimer";
 
 type TimerState = 'stopped' | 'running' | 'paused' | 'break';
 
@@ -35,10 +36,7 @@ interface Program {
 export default function Timer() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [state, setState] = useState<TimerState>('stopped');
   const [duration, setDuration] = useState(45); // durée en minutes
-  const [timeLeft, setTimeLeft] = useState(45 * 60); // 45 minutes par défaut
-  const [totalTime, setTotalTime] = useState(45 * 60);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [breakExercises, setBreakExercises] = useState<Exercise[]>([]);
   const [completedExercises, setCompletedExercises] = useState<string[]>([]);
@@ -54,31 +52,49 @@ export default function Timer() {
     showLocalNotification 
   } = usePWA();
 
-  // Timer logic
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    
-    if (state === 'running' && timeLeft > 0) {
-      interval = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            // Temps écoulé, passer en pause
-            handleTimeUp();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+  // Hook résilient pour timer
+  const {
+    state,
+    timeLeft,
+    progress,
+    startTimer,
+    pauseTimer,
+    resumeTimer,
+    stopTimer,
+    formatTime
+  } = useResilientTimer(handleTimeUp);
+
+  async function handleTimeUp() {
+    // Charger des exercices aléatoires
+    const exercises = await getRandomExercises();
+    setBreakExercises(exercises);
+
+    // Ajouter les exercices à la session
+    if (sessionId && exercises.length > 0) {
+      const sessionExercises = exercises.map(exercise => ({
+        session_id: sessionId,
+        exercise_id: exercise.id,
+      }));
+
+      await supabase
+        .from('session_exercises')
+        .insert(sessionExercises);
     }
 
-    return () => clearInterval(interval);
-  }, [state, timeLeft]);
+    // Notification si activée
+    if (notificationsEnabled && notificationPermission === 'granted') {
+      showLocalNotification('Mouv\'Minute - Temps de pause !', {
+        body: 'C\'est l\'heure de faire quelques exercices.',
+        tag: 'break-reminder',
+        requireInteraction: true,
+      });
+    }
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
+    toast({
+      title: "⏰ Temps de pause !",
+      description: "Prenez quelques minutes pour vous étirer avec nos exercices.",
+    });
+  }
 
   const getRandomExercises = async () => {
     const { data: allExercises } = await supabase
@@ -117,7 +133,9 @@ export default function Timer() {
       if (error) throw error;
 
       setSessionId(session?.id);
-      setState('running');
+      
+      // Démarrer le timer résilient
+      await startTimer(duration * 60 * 1000, session?.id); // Convertir en ms
       
       toast({
         title: "Session démarrée",
@@ -133,53 +151,18 @@ export default function Timer() {
     }
   };
 
-  const handleTimeUp = async () => {
-    setState('break');
-    
-    // Charger des exercices aléatoires
-    const exercises = await getRandomExercises();
-    setBreakExercises(exercises);
-
-    // Ajouter les exercices à la session
-    if (sessionId && exercises.length > 0) {
-      const sessionExercises = exercises.map(exercise => ({
-        session_id: sessionId,
-        exercise_id: exercise.id,
-      }));
-
-      await supabase
-        .from('session_exercises')
-        .insert(sessionExercises);
-    }
-
-    // Notification si activée
-    if (notificationsEnabled && notificationPermission === 'granted') {
-      showLocalNotification('Mouv\'Minute - Temps de pause !', {
-        body: 'C\'est l\'heure de faire quelques exercices.',
-        tag: 'break-reminder',
-        requireInteraction: true,
-      });
-    }
-
-    toast({
-      title: "⏰ Temps de pause !",
-      description: "Prenez quelques minutes pour vous étirer avec nos exercices.",
-    });
-  };
-
   const toggleTimer = () => {
     if (state === 'running') {
-      setState('paused');
+      pauseTimer();
     } else if (state === 'paused') {
-      setState('running');
+      resumeTimer();
     } else {
       startSession();
     }
   };
 
   const resetTimer = () => {
-    setState('stopped');
-    setTimeLeft(totalTime);
+    stopTimer();
     setSessionId(null);
     setBreakExercises([]);
     setCompletedExercises([]);
@@ -189,9 +172,6 @@ export default function Timer() {
   const handleDurationChange = (newDuration: number) => {
     if (state === 'stopped') {
       setDuration(newDuration);
-      const newTotalTime = newDuration * 60;
-      setTimeLeft(newTotalTime);
-      setTotalTime(newTotalTime);
     }
   };
 
@@ -242,7 +222,6 @@ export default function Timer() {
     }
   };
 
-  const progress = ((totalTime - timeLeft) / totalTime) * 100;
   const allExercisesCompleted = breakExercises.length > 0 && 
     breakExercises.every(exercise => completedExercises.includes(exercise.id));
 
@@ -310,7 +289,7 @@ export default function Timer() {
         const exercises = programExercises.map(pe => pe.exercises).filter(Boolean);
         setBreakExercises(exercises);
         setCompletedExercises([]);
-        setState('break');
+        // L'état break sera géré automatiquement par useResilientTimer
         
         // Ajouter les exercices à la session si une session est active
         if (sessionId) {

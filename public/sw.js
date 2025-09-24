@@ -119,82 +119,96 @@ self.addEventListener('fetch', (event) => {
   }
 });
 
-// Gestion des notifications push
-self.addEventListener('push', (event) => {
-  console.log('[SW] Push message received:', event);
+// Gestionnaire d'événements push
+self.addEventListener('push', event => {
+  console.log('Push event received:', event);
   
-  const options = {
-    body: 'C\'est l\'heure de faire une pause et quelques exercices !',
-    icon: '/icon-192.png',
-    badge: '/icon-192.png',
-    tag: 'mouvminute-reminder',
-    requireInteraction: true,
-    actions: [
-      {
-        action: 'open-timer',
-        title: 'Ouvrir le timer',
-        icon: '/icon-192.png'
-      },
-      {
-        action: 'dismiss',
-        title: 'Plus tard',
-        icon: '/icon-192.png'
-      }
-    ],
-    data: {
-      url: '/timer'
-    }
-  };
-  
-  if (event.data) {
-    try {
-      const data = event.data.json();
-      options.body = data.body || options.body;
-      options.data.url = data.url || options.data.url;
-    } catch (e) {
-      console.warn('[SW] Failed to parse push data:', e);
-    }
+  if (!event.data) {
+    console.log('No data in push event');
+    return;
   }
-  
-  event.waitUntil(
-    self.registration.showNotification('Mouv\'Minute', options)
-  );
+
+  try {
+    const data = event.data.json();
+    console.log('Push data:', data);
+    
+    const notificationOptions = {
+      body: data.body || 'C\'est l\'heure de faire quelques exercices !',
+      icon: data.icon || '/Logo.png',
+      badge: data.badge || '/Logo.png',
+      tag: data.tag || 'mouv-minute-notification',
+      requireInteraction: data.requireInteraction || true,
+      actions: data.actions || [
+        { action: 'open', title: 'Voir les exercices' },
+        { action: 'dismiss', title: 'Plus tard' }
+      ],
+      data: data.data || { url: '/timer' }
+    };
+
+    const title = data.title || 'Mouv\'Minute - Temps de pause !';
+    
+    event.waitUntil(
+      self.registration.showNotification(title, notificationOptions)
+    );
+  } catch (error) {
+    console.error('Error handling push event:', error);
+    
+    // Fallback notification
+    event.waitUntil(
+      self.registration.showNotification('Mouv\'Minute - Temps de pause !', {
+        body: 'C\'est l\'heure de faire quelques exercices !',
+        icon: '/Logo.png',
+        badge: '/Logo.png',
+        tag: 'mouv-minute-fallback',
+        requireInteraction: true,
+        actions: [
+          { action: 'open', title: 'Ouvrir l\'app' },
+          { action: 'dismiss', title: 'Fermer' }
+        ],
+        data: { url: '/timer' }
+      })
+    );
+  }
 });
 
-// Gestion des clics sur les notifications
-self.addEventListener('notificationclick', (event) => {
-  console.log('[SW] Notification clicked:', event);
+// Gestionnaire de clic sur notification
+self.addEventListener('notificationclick', event => {
+  console.log('Notification clicked:', event);
   
   event.notification.close();
   
-  const urlToOpen = event.notification.data?.url || '/timer';
+  const action = event.action;
+  const notificationData = event.notification.data || {};
+  const url = notificationData.url || '/timer';
   
-  if (event.action === 'open-timer') {
-    event.waitUntil(
-      clients.openWindow(urlToOpen)
-    );
-  } else if (event.action === 'dismiss') {
-    // Ne rien faire, juste fermer la notification
+  if (action === 'dismiss') {
+    // Ne rien faire, juste fermer
     return;
-  } else {
-    // Clic sur la notification principale
-    event.waitUntil(
-      clients.matchAll({ type: 'window', includeUncontrolled: true })
-        .then((clientList) => {
-          // Chercher un onglet existant avec l'app
-          for (const client of clientList) {
-            if (client.url.includes(self.location.origin) && 'focus' in client) {
-              client.navigate(urlToOpen);
-              return client.focus();
-            }
-          }
-          // Ouvrir un nouvel onglet si aucun trouvé
-          if (clients.openWindow) {
-            return clients.openWindow(urlToOpen);
-          }
-        })
-    );
   }
+  
+  // Ouvrir ou focuser la fenêtre de l'app
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
+      // Chercher une fenêtre existante
+      for (const client of clientList) {
+        if (client.url.includes(self.location.origin)) {
+          // Naviguer vers l'URL appropriée si nécessaire
+          if (url && !client.url.includes(url)) {
+            return client.navigate(url).then(client => client?.focus());
+          }
+          return client.focus();
+        }
+      }
+      
+      // Ouvrir une nouvelle fenêtre si aucune n'existe
+      const fullUrl = self.location.origin + url;
+      return clients.openWindow(fullUrl);
+    }).catch(error => {
+      console.error('Error handling notification click:', error);
+      // Fallback: ouvrir juste la page d'accueil
+      return clients.openWindow(self.location.origin);
+    })
+  );
 });
 
 // Gestion des erreurs
