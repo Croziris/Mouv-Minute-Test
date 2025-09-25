@@ -344,7 +344,7 @@ export default function Timer() {
                           color: state === 'running' ? '#E67E22' : 'hsl(var(--primary))'
                         }}
                       >
-                        {state === 'stopped' ? formatTime(duration * 60 * 1) : formatTime(timeLeft)}
+                        {state === 'stopped' ? formatTime(duration * 60) : formatTime(timeLeft)}
                       </div>
                       <div className="text-sm text-muted-foreground mt-1">
                         {state === 'stopped' && 'Prêt à commencer'}
