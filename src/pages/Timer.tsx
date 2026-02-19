@@ -1,364 +1,200 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Play, Pause, RotateCcw, CheckCircle, Clock, Bell, BellOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Layout } from "@/components/layout/Layout";
-import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { usePWA } from "@/hooks/usePWA";
 import { ExerciseTimer } from "@/components/ExerciseTimer";
-import { useResilientTimer } from "@/hooks/useResilientTimer";
+import { Exercise, getPrograms, getRandomExercises } from "@/data/mockContent";
+import { addSessionHistoryItem } from "@/lib/localSessionStore";
 
-type TimerState = 'stopped' | 'running' | 'paused' | 'break';
+type TimerState = "stopped" | "running" | "paused" | "break";
 
-interface Exercise {
-  id: string;
-  title: string;
-  description_public: string;
-  duration_sec: number;
-  zone: string;
-  media_primary: string | null;
-  notes_kine: string | null;
-}
-
-interface Program {
-  id: string;
-  title: string;
-  description: string;
-  order_index: number;
-}
+const isYoutubeEmbed = (value: string) => value.includes("youtube");
 
 export default function Timer() {
-  const { user } = useAuth();
   const navigate = useNavigate();
-  const [duration, setDuration] = useState(45); // durée en minutes
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [duration, setDuration] = useState(45);
+  const [state, setState] = useState<TimerState>("stopped");
+  const [timeLeft, setTimeLeft] = useState(duration * 60);
   const [breakExercises, setBreakExercises] = useState<Exercise[]>([]);
   const [completedExercises, setCompletedExercises] = useState<string[]>([]);
-  const [programs, setPrograms] = useState<Program[]>([]);
-  const [selectedProgram, setSelectedProgram] = useState<string | null>(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
-  // Hook PWA pour notifications
-  const { 
-    supportsNotifications, 
-    notificationPermission, 
-    requestNotificationPermission,
-    showLocalNotification 
-  } = usePWA();
+  const programs = useMemo(() => getPrograms(), []);
 
-  // Hook résilient pour timer
-  const {
-    state,
-    timeLeft,
-    progress,
-    startTimer,
-    pauseTimer,
-    resumeTimer,
-    stopTimer,
-    formatTime
-  } = useResilientTimer(handleTimeUp);
+  const { supportsNotifications, notificationPermission, requestNotificationPermission, showLocalNotification } =
+    usePWA();
 
-  async function handleTimeUp() {
-    // Charger des exercices aléatoires
-    const exercises = await getRandomExercises();
-    setBreakExercises(exercises);
-
-    // Ajouter les exercices à la session
-    if (sessionId && exercises.length > 0) {
-      const sessionExercises = exercises.map(exercise => ({
-        session_id: sessionId,
-        exercise_id: exercise.id,
-      }));
-
-      await supabase
-        .from('session_exercises')
-        .insert(sessionExercises);
-    }
-
-    // Notification si activée
-    if (notificationsEnabled && notificationPermission === 'granted') {
-      showLocalNotification('Mouv\'Minute - Temps de pause !', {
-        body: 'C\'est l\'heure de faire quelques exercices.',
-        tag: 'break-reminder',
-        requireInteraction: true,
-      });
-    }
-
-    toast({
-      title: "⏰ Temps de pause !",
-      description: "Prenez quelques minutes pour vous étirer avec nos exercices.",
-    });
-  }
-
-  const getRandomExercises = async () => {
-    const { data: allExercises } = await supabase
-      .from('exercises')
-      .select('id, title, description_public, duration_sec, zone, media_primary, notes_kine')
-      .limit(20);
-
-    if (allExercises && allExercises.length > 0) {
-      // Sélectionner 2-5 exercices aléatoires
-      const shuffled = [...allExercises].sort(() => 0.5 - Math.random());
-      return shuffled.slice(0, 5);
-    }
-    return [];
-  };
-
-  const startSession = async () => {
-    if (!user) {
-      toast({
-        title: "Connexion requise",
-        description: "Vous devez être connecté pour démarrer une session.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      // Créer une nouvelle session (user_id is auto-set by trigger)
-      const { data: session, error } = await supabase
-        .from('sessions')
-        .insert([{
-          duration_minutes: duration,
-        } as any])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setSessionId(session?.id);
-      
-      // Démarrer le timer résilient
-      await startTimer(duration * 60 * 1000, session?.id); // Convertir en ms
-      
-      toast({
-        title: "Session démarrée",
-        description: `Session de ${duration} minutes commencée.`,
-      });
-    } catch (error) {
-      console.error('Error starting session:', error);
-      toast({
-        title: "Erreur",
-        description: "Impossible de démarrer la session.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const toggleTimer = () => {
-    if (state === 'running') {
-      pauseTimer();
-    } else if (state === 'paused') {
-      resumeTimer();
-    } else {
-      startSession();
-    }
-  };
-
-  const resetTimer = () => {
-    stopTimer();
-    setSessionId(null);
-    setBreakExercises([]);
-    setCompletedExercises([]);
-  };
-
-  // Gestion des contrôles de durée
-  const handleDurationChange = (newDuration: number) => {
-    if (state === 'stopped') {
-      setDuration(newDuration);
-    }
-  };
-
-  const handleSliderChange = (value: number[]) => {
-    const newDuration = value[0];
-    handleDurationChange(newDuration);
-  };
-
-  const markExerciseCompleted = (exerciseId: string) => {
-    setCompletedExercises(prev => [...prev, exerciseId]);
-  };
-
-  const completeSession = async () => {
-    if (!sessionId) return;
-
-    try {
-      // Marquer la session comme terminée
-      await supabase
-        .from('sessions')
-        .update({
-          ended_at: new Date().toISOString(),
-          completed: true,
-        })
-        .eq('id', sessionId);
-
-      // Marquer les exercices comme terminés
-      if (completedExercises.length > 0) {
-        await supabase
-          .from('session_exercises')
-          .update({ completed: true })
-          .eq('session_id', sessionId)
-          .in('exercise_id', completedExercises);
-      }
-
-      toast({
-        title: "Séance validée !",
-        description: "Votre session a été enregistrée avec succès.",
-      });
-
-      resetTimer();
-    } catch (error) {
-      console.error('Error completing session:', error);
-      toast({
-        title: "Erreur",
-        description: "Impossible de valider la session.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const allExercisesCompleted = breakExercises.length > 0 && 
-    breakExercises.every(exercise => completedExercises.includes(exercise.id));
-
-  // Charger les programmes
   useEffect(() => {
-    const fetchPrograms = async () => {
-      const { data } = await supabase
-        .from('programs')
-        .select('*')
-        .order('order_index', { ascending: true });
-      
-      if (data) {
-        setPrograms(data);
-      }
-    };
+    if (state !== "running") return;
 
-    fetchPrograms();
-  }, []);
+    const interval = window.setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          const selectedExercises = getRandomExercises(5);
+          setBreakExercises(selectedExercises);
+          setCompletedExercises([]);
+          setState("break");
 
-  // Initialiser les notifications
+          if (notificationsEnabled && notificationPermission === "granted") {
+            showLocalNotification("Mouv'Minute - Temps de pause", {
+              body: "C'est l'heure de faire quelques exercices.",
+              tag: "break-reminder",
+              requireInteraction: true,
+            });
+          }
+
+          toast({
+            title: "Temps de pause",
+            description: "Prenez quelques minutes pour vous etirer avec nos exercices.",
+          });
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(interval);
+  }, [state, notificationsEnabled, notificationPermission, showLocalNotification]);
+
   useEffect(() => {
-    // Vérifier si les notifications étaient précédemment activées
-    const savedNotificationState = localStorage.getItem('notifications-enabled');
-    if (savedNotificationState === 'true' && notificationPermission === 'granted') {
+    if (state === "stopped") {
+      setTimeLeft(duration * 60);
+    }
+  }, [duration, state]);
+
+  useEffect(() => {
+    const savedNotificationState = localStorage.getItem("notifications-enabled");
+    if (savedNotificationState === "true" && notificationPermission === "granted") {
       setNotificationsEnabled(true);
     }
   }, [notificationPermission]);
 
-  // Gérer l'activation/désactivation des notifications
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const toggleTimer = () => {
+    if (state === "running") {
+      setState("paused");
+      return;
+    }
+    if (state === "paused") {
+      setState("running");
+      return;
+    }
+
+    setBreakExercises([]);
+    setCompletedExercises([]);
+    setTimeLeft(duration * 60);
+    setState("running");
+    toast({
+      title: "Session demarree",
+      description: `Session de ${duration} minutes commencee.`,
+    });
+  };
+
+  const resetTimer = () => {
+    setState("stopped");
+    setBreakExercises([]);
+    setCompletedExercises([]);
+    setTimeLeft(duration * 60);
+  };
+
+  const handleDurationChange = (newDuration: number) => {
+    if (state === "stopped") {
+      setDuration(newDuration);
+    }
+  };
+
+  const markExerciseCompleted = (exerciseId: string) => {
+    setCompletedExercises((prev) => (prev.includes(exerciseId) ? prev : [...prev, exerciseId]));
+  };
+
+  const completeSession = () => {
+    addSessionHistoryItem({
+      duration_minutes: duration,
+      completed: true,
+    });
+
+    toast({
+      title: "Seance validee",
+      description: "Votre session locale a ete enregistree.",
+    });
+
+    resetTimer();
+  };
+
   const handleNotificationToggle = async (enabled: boolean) => {
-    if (enabled && notificationPermission !== 'granted') {
+    if (enabled && notificationPermission !== "granted") {
       const granted = await requestNotificationPermission();
       if (granted) {
         setNotificationsEnabled(true);
-        localStorage.setItem('notifications-enabled', 'true');
+        localStorage.setItem("notifications-enabled", "true");
       }
-    } else {
-      setNotificationsEnabled(enabled);
-      localStorage.setItem('notifications-enabled', enabled.toString());
+      return;
     }
+
+    setNotificationsEnabled(enabled);
+    localStorage.setItem("notifications-enabled", enabled.toString());
   };
 
-  const launchProgram = async (programId: string) => {
-    try {
-      // Récupérer les exercices du programme
-      const { data: programExercises } = await supabase
-        .from('program_exercises')
-        .select(`
-          exercise_id,
-          order_index,
-          exercises (
-            id,
-            title,
-            description_public,
-            duration_sec,
-            zone,
-            media_primary,
-            notes_kine
-          )
-        `)
-        .eq('program_id', programId)
-        .order('order_index', { ascending: true });
-
-      if (programExercises && programExercises.length > 0) {
-        const exercises = programExercises.map(pe => pe.exercises).filter(Boolean);
-        setBreakExercises(exercises);
-        setCompletedExercises([]);
-        // L'état break sera géré automatiquement par useResilientTimer
-        
-        // Ajouter les exercices à la session si une session est active
-        if (sessionId) {
-          const sessionExercises = exercises.map(exercise => ({
-            session_id: sessionId,
-            exercise_id: exercise.id,
-          }));
-
-          await supabase
-            .from('session_exercises')
-            .insert(sessionExercises);
-        }
-      }
-    } catch (error) {
-      console.error('Error launching program:', error);
-      toast({
-        title: "Erreur",
-        description: "Impossible de lancer le programme.",
-        variant: "destructive",
-      });
-    }
-  };
+  const progress = ((duration * 60 - timeLeft) / Math.max(1, duration * 60)) * 100;
+  const allExercisesCompleted =
+    breakExercises.length > 0 && breakExercises.every((exercise) => completedExercises.includes(exercise.id));
 
   return (
     <Layout>
       <div className="container mx-auto px-4 py-6">
-        {state !== 'break' ? (
-          /* État normal - Timer */
+        {state !== "break" ? (
           <div className="max-w-md mx-auto space-y-8">
             <div className="text-center space-y-4">
               <h1 className="text-2xl font-heading font-bold">Session de travail</h1>
               <p className="text-muted-foreground">
-                Concentrez-vous sur votre travail. Nous vous préviendrons quand il sera temps de faire une pause.
+                Concentrez-vous sur votre travail. Nous vous previendrons quand il sera temps de faire une
+                pause.
               </p>
             </div>
 
-            {/* Timer circulaire */}
             <Card className="text-center">
               <CardContent className="p-8">
                 <div className="relative mb-6">
                   <div className="mx-auto h-48 w-48 rounded-full border-8 border-secondary flex items-center justify-center relative overflow-hidden">
-                     <div 
+                    <div
                       className="absolute inset-0 rounded-full transition-all duration-1000"
                       style={{
-                        background: `conic-gradient(hsl(var(--primary)) ${progress * 3.6}deg, transparent 0deg)`,
+                        background: `conic-gradient(hsl(var(--primary)) ${
+                          Math.max(0, Math.min(100, progress)) * 3.6
+                        }deg, transparent 0deg)`,
                       }}
                     />
                     <div className="relative z-20 text-center">
-                      <div 
+                      <div
                         className="text-3xl font-heading font-bold transition-colors duration-300"
                         style={{
-                          color: state === 'running' ? '#E67E22' : 'hsl(var(--primary))'
+                          color: state === "running" ? "#E67E22" : "hsl(var(--primary))",
                         }}
                       >
-                        {state === 'stopped' ? formatTime(duration * 60) : formatTime(timeLeft)}
+                        {state === "stopped" ? formatTime(duration * 60) : formatTime(timeLeft)}
                       </div>
                       <div className="text-sm text-muted-foreground mt-1">
-                        {state === 'stopped' && 'Prêt à commencer'}
-                        {state === 'running' && 'En cours...'}
-                        {state === 'paused' && 'En pause'}
+                        {state === "stopped" && "Pret a commencer"}
+                        {state === "running" && "En cours..."}
+                        {state === "paused" && "En pause"}
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Contrôles de durée */}
-                {state === 'stopped' && (
+                {state === "stopped" && (
                   <div className="space-y-4 mb-6">
-                    {/* Boutons de choix rapide */}
                     <div className="flex gap-2 justify-center">
                       {[30, 45, 60].map((minutes) => (
                         <Button
@@ -372,14 +208,13 @@ export default function Timer() {
                       ))}
                     </div>
 
-                    {/* Slider manuel */}
                     <div className="space-y-2">
                       <div className="text-sm text-muted-foreground text-center">
-                        Durée personnalisée: {duration} minutes
+                        Duree personnalisee: {duration} minutes
                       </div>
                       <Slider
                         value={[duration]}
-                        onValueChange={handleSliderChange}
+                        onValueChange={(value) => handleDurationChange(value[0])}
                         min={5}
                         max={60}
                         step={5}
@@ -393,19 +228,17 @@ export default function Timer() {
                   </div>
                 )}
 
-                
-
                 <div className="flex gap-4 justify-center">
                   <Button
                     onClick={toggleTimer}
                     size="lg"
                     className={
-                      state === 'running' 
+                      state === "running"
                         ? "bg-accent hover:bg-accent-light text-accent-foreground"
                         : "bg-primary hover:bg-primary-dark text-primary-foreground"
                     }
                   >
-                    {state === 'running' ? (
+                    {state === "running" ? (
                       <>
                         <Pause className="mr-2 h-5 w-5" />
                         Pause
@@ -413,12 +246,12 @@ export default function Timer() {
                     ) : (
                       <>
                         <Play className="mr-2 h-5 w-5" />
-                        {state === 'stopped' ? 'Démarrer' : 'Reprendre'}
+                        {state === "stopped" ? "Demarrer" : "Reprendre"}
                       </>
                     )}
                   </Button>
 
-                  {state !== 'stopped' && (
+                  {state !== "stopped" && (
                     <Button onClick={resetTimer} variant="outline" size="lg">
                       <RotateCcw className="mr-2 h-4 w-4" />
                       Reset
@@ -433,16 +266,15 @@ export default function Timer() {
                 <div className="flex items-center gap-3">
                   <Clock className="h-5 w-5 text-primary" />
                   <div>
-                    <p className="text-sm font-medium">Durée recommandée</p>
+                    <p className="text-sm font-medium">Duree recommandee</p>
                     <p className="text-xs text-muted-foreground">
-                      30 à 45 minutes de travail, puis 5 minutes d'exercices
+                      30 a 45 minutes de travail, puis 5 minutes d'exercices
                     </p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Contrôle des notifications - Version simplifiée intégrée */}
             {supportsNotifications && (
               <Card className="bg-accent/10 border-accent/20">
                 <CardContent className="p-4">
@@ -456,20 +288,17 @@ export default function Timer() {
                       <div>
                         <p className="text-sm font-medium">Notifications de rappel</p>
                         <p className="text-xs text-muted-foreground">
-                          Recevoir des alertes à la fin des sessions, optimisé seulement sur PC.
+                          Recevoir des alertes a la fin des sessions.
                         </p>
                       </div>
                     </div>
-                    <Switch
-                      checked={notificationsEnabled}
-                      onCheckedChange={handleNotificationToggle}
-                    />
+                    <Switch checked={notificationsEnabled} onCheckedChange={handleNotificationToggle} />
                   </div>
-                  
-                  {notificationPermission === 'denied' && (
+
+                  {notificationPermission === "denied" && (
                     <div className="mt-3 p-2 bg-destructive/10 rounded-md">
                       <p className="text-xs text-destructive">
-                        Notifications bloquées. Réactivez-les dans les paramètres de votre navigateur.
+                        Notifications bloquees. Reactivez-les dans les parametres de votre navigateur.
                       </p>
                     </div>
                   )}
@@ -477,12 +306,11 @@ export default function Timer() {
               </Card>
             )}
 
-            {/* Programmes de séances */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg font-heading">Programmes de séances</CardTitle>
+                <CardTitle className="text-lg font-heading">Programmes de seances</CardTitle>
                 <CardDescription>
-                  Séances prédéfinies de 3 à 5 exercices que vous pouvez lancer à tout moment
+                  Seances predefinies de 3 a 5 exercices que vous pouvez lancer a tout moment.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -494,12 +322,8 @@ export default function Timer() {
                       onClick={() => navigate(`/session/${program.id}`)}
                     >
                       <CardContent className="p-4">
-                        <h3 className="font-medium text-base mb-2 text-primary">
-                          {program.title}
-                        </h3>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                          {program.description}
-                        </p>
+                        <h3 className="font-medium text-base mb-2 text-primary">{program.title}</h3>
+                        <p className="text-sm text-muted-foreground leading-relaxed">{program.description}</p>
                         <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
                           <span>3-5 exercices</span>
                           <span>•</span>
@@ -513,22 +337,17 @@ export default function Timer() {
             </Card>
           </div>
         ) : (
-          /* État pause - Exercices */
           <div className="max-w-2xl mx-auto space-y-6">
             <div className="text-center space-y-2">
-              <h1 className="text-2xl font-heading font-bold text-accent">
-                ⏰ C'est l'heure de la pause !
-              </h1>
-              <p className="text-muted-foreground">
-                Prenez quelques minutes pour vous étirer et vous détendre.
-              </p>
+              <h1 className="text-2xl font-heading font-bold text-accent">C'est l'heure de la pause</h1>
+              <p className="text-muted-foreground">Prenez quelques minutes pour vous etirer et vous detendre.</p>
             </div>
 
             {breakExercises.length > 0 ? (
               <div className="space-y-4">
                 {breakExercises.map((exercise) => (
-                  <Card 
-                    key={exercise.id} 
+                  <Card
+                    key={exercise.id}
                     className={
                       completedExercises.includes(exercise.id)
                         ? "border-primary bg-primary/5"
@@ -538,9 +357,7 @@ export default function Timer() {
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
                         <div>
-                          <CardTitle className="text-lg font-heading">
-                            {exercise.title}
-                          </CardTitle>
+                          <CardTitle className="text-lg font-heading">{exercise.title}</CardTitle>
                           <CardDescription className="text-sm">
                             Zone: {exercise.zone} • {exercise.duration_sec}s
                           </CardDescription>
@@ -553,28 +370,29 @@ export default function Timer() {
                             onClick={() => markExerciseCompleted(exercise.id)}
                             className="bg-primary hover:bg-primary-dark text-primary-foreground"
                           >
-                            Terminé
+                            Termine
                           </Button>
                         )}
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       {exercise.media_primary && (
-                        <div>
-                          <video
-                            src={exercise.media_primary}
-                            autoPlay
-                            loop
-                            muted
-                            playsInline
-                            className="w-full rounded-lg"
-                            style={{ maxHeight: '300px' }}
-                          >
-                            Votre navigateur ne supporte pas la lecture vidéo.
-                          </video>
+                        <div className="rounded-lg overflow-hidden bg-black/5">
+                          {isYoutubeEmbed(exercise.media_primary) ? (
+                            <iframe
+                              src={exercise.media_primary}
+                              title={exercise.title}
+                              className="w-full aspect-video"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                              referrerPolicy="strict-origin-when-cross-origin"
+                              allowFullScreen
+                            />
+                          ) : (
+                            <video src={exercise.media_primary} autoPlay loop muted playsInline className="w-full" />
+                          )}
                         </div>
                       )}
-                      
+
                       <div className="grid gap-4">
                         <div>
                           <h4 className="font-medium mb-2">Description</h4>
@@ -582,25 +400,22 @@ export default function Timer() {
                             {exercise.description_public}
                           </p>
                         </div>
-                        
+
                         {exercise.notes_kine && (
                           <div>
-                            <h4 className="font-medium mb-2">💡 Tips kiné</h4>
-                            <p className="text-sm text-muted-foreground leading-relaxed">
-                              {exercise.notes_kine}
-                            </p>
+                            <h4 className="font-medium mb-2">Tips kine</h4>
+                            <p className="text-sm text-muted-foreground leading-relaxed">{exercise.notes_kine}</p>
                           </div>
                         )}
                       </div>
-                      
-                      {/* Timer pour l'exercice */}
+
                       <div className="mt-4">
                         <ExerciseTimer
                           durationSec={exercise.duration_sec}
                           onComplete={() => {
                             toast({
-                              title: "Timer terminé !",
-                              description: `Temps d'exercice écoulé pour ${exercise.title}`,
+                              title: "Timer termine",
+                              description: `Temps d'exercice ecoule pour ${exercise.title}.`,
                             });
                           }}
                         />
@@ -612,9 +427,7 @@ export default function Timer() {
             ) : (
               <Card>
                 <CardContent className="p-8 text-center">
-                  <p className="text-muted-foreground">
-                    Aucun exercice disponible pour le moment.
-                  </p>
+                  <p className="text-muted-foreground">Aucun exercice disponible pour le moment.</p>
                 </CardContent>
               </Card>
             )}
@@ -627,9 +440,9 @@ export default function Timer() {
                 className="bg-accent hover:bg-accent-light text-accent-foreground disabled:opacity-50"
               >
                 <CheckCircle className="mr-2 h-5 w-5" />
-                Valider la séance
+                Valider la seance
               </Button>
-              
+
               <Button onClick={resetTimer} variant="outline" size="lg">
                 Nouvelle session
               </Button>
@@ -637,7 +450,7 @@ export default function Timer() {
 
             {!allExercisesCompleted && (
               <p className="text-center text-sm text-muted-foreground">
-                Terminez tous les exercices pour valider votre séance
+                Terminez tous les exercices pour valider votre seance
               </p>
             )}
           </div>

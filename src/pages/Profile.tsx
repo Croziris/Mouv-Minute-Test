@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { User, Settings, TrendingUp, Clock, Award } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { User, Settings, TrendingUp, Award } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,13 +8,9 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Layout } from "@/components/layout/Layout";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-
-interface ProfileData {
-  display_name: string;
-  email: string;
-}
+import { getSessionHistory } from "@/lib/localSessionStore";
+import { Link } from "react-router-dom";
 
 interface SessionStats {
   totalSessions: number;
@@ -24,150 +20,113 @@ interface SessionStats {
   monthSessions: number;
 }
 
+const SETTINGS_KEY = "mouv-minute-profile-settings";
+
+const safeParse = <T,>(value: string | null, fallback: T): T => {
+  if (!value) return fallback;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
+};
+
 export default function Profile() {
-  const { user, signOut } = useAuth();
-  const [profile, setProfile] = useState<ProfileData>({ display_name: '', email: '' });
-  const [stats, setStats] = useState<SessionStats>({
-    totalSessions: 0,
-    completedSessions: 0,
-    totalTimeMinutes: 0,
-    weekSessions: 0,
-    monthSessions: 0,
-  });
-  const [loading, setLoading] = useState(true);
+  const { user, signOut, updateProfile } = useAuth();
   const [saving, setSaving] = useState(false);
-  
-  // Paramètres
   const [sessionDuration, setSessionDuration] = useState(45);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
+  const [profile, setProfile] = useState(() => ({
+    display_name: user?.displayName ?? "",
+    email: user?.email ?? "",
+  }));
+
   useEffect(() => {
-    if (user) {
-      loadProfile();
-      loadStats();
-    }
-  }, [user]);
+    const saved = safeParse<{ sessionDuration: number; notificationsEnabled: boolean }>(
+      localStorage.getItem(SETTINGS_KEY),
+      { sessionDuration: 45, notificationsEnabled: true }
+    );
+    setSessionDuration(saved.sessionDuration);
+    setNotificationsEnabled(saved.notificationsEnabled);
+  }, []);
 
-  const loadProfile = async () => {
-    if (!user) return;
+  const stats = useMemo<SessionStats>(() => {
+    const sessions = getSessionHistory();
+    const now = new Date();
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const completedSessions = sessions.filter((session) => session.completed);
+    const weekSessions = sessions.filter((session) => new Date(session.created_at) > weekAgo);
+    const monthSessions = sessions.filter((session) => new Date(session.created_at) > monthAgo);
+    const totalTimeMinutes = completedSessions.reduce(
+      (sum, session) => sum + (session.duration_minutes || 0),
+      0
+    );
 
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('display_name, email')
-        .eq('user_id', user.id)
-        .single();
-
-      if (error && error.code !== 'PGRST116') { // Pas d'erreur si pas de résultat
-        throw error;
-      }
-
-      if (data) {
-        setProfile(data);
-      } else {
-        // Pas de profil trouvé, utiliser les données de l'utilisateur
-        setProfile({
-          display_name: user.user_metadata?.display_name || '',
-          email: user.email || '',
-        });
-      }
-    } catch (error) {
-      console.error('Error loading profile:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadStats = async () => {
-    if (!user) return;
-
-    try {
-      // Sessions totales
-      const { data: allSessions } = await supabase
-        .from('sessions')
-        .select('completed, duration_minutes, created_at')
-        .eq('user_id', user.id);
-
-      if (allSessions) {
-        const now = new Date();
-        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-
-        const completedSessions = allSessions.filter(s => s.completed);
-        const weekSessions = allSessions.filter(s => new Date(s.created_at) > weekAgo);
-        const monthSessions = allSessions.filter(s => new Date(s.created_at) > monthAgo);
-        
-        const totalTimeMinutes = completedSessions.reduce((sum, session) => 
-          sum + (session.duration_minutes || 0), 0
-        );
-
-        setStats({
-          totalSessions: allSessions.length,
-          completedSessions: completedSessions.length,
-          totalTimeMinutes,
-          weekSessions: weekSessions.length,
-          monthSessions: monthSessions.length,
-        });
-      }
-    } catch (error) {
-      console.error('Error loading stats:', error);
-    }
-  };
+    return {
+      totalSessions: sessions.length,
+      completedSessions: completedSessions.length,
+      totalTimeMinutes,
+      weekSessions: weekSessions.length,
+      monthSessions: monthSessions.length,
+    };
+  }, []);
 
   const saveProfile = async () => {
     if (!user) return;
-
     setSaving(true);
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .upsert({
-          user_id: user.id,
-          display_name: profile.display_name,
-          // Don't update email - it's protected by trigger
-        });
 
-      if (error) throw error;
+    const { error } = await updateProfile({
+      displayName: profile.display_name,
+      email: profile.email,
+    });
 
-      toast({
-        title: "Profil mis à jour",
-        description: "Vos informations ont été sauvegardées.",
-      });
-    } catch (error) {
-      console.error('Error saving profile:', error);
+    if (error) {
       toast({
         title: "Erreur",
         description: "Impossible de sauvegarder le profil.",
         variant: "destructive",
       });
-    } finally {
       setSaving(false);
+      return;
     }
-  };
 
-  const handleSignOut = async () => {
-    await signOut();
+    localStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify({
+        sessionDuration,
+        notificationsEnabled,
+      })
+    );
+
+    toast({
+      title: "Profil mis a jour",
+      description: "Vos informations locales ont ete sauvegardees.",
+    });
+    setSaving(false);
   };
 
   const formatTime = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
-    
-    if (hours > 0) {
-      return `${hours}h ${mins}min`;
-    }
+    if (hours > 0) return `${hours}h ${mins}min`;
     return `${mins}min`;
   };
 
-  if (loading) {
+  if (!user) {
     return (
       <Layout showBottomNav={false}>
-        <div className="container mx-auto px-4 py-6">
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-muted rounded w-1/3"></div>
-            <div className="h-32 bg-muted rounded"></div>
-            <div className="h-48 bg-muted rounded"></div>
-          </div>
+        <div className="container mx-auto px-4 py-6 max-w-2xl">
+          <Card className="p-6 text-center">
+            <h1 className="text-2xl font-heading font-bold mb-4">Connexion requise</h1>
+            <p className="text-muted-foreground mb-6">
+              Connectez-vous pour acceder a votre profil local et vos statistiques.
+            </p>
+            <Link to="/auth">
+              <Button>Aller a la connexion</Button>
+            </Link>
+          </Card>
         </div>
       </Layout>
     );
@@ -176,98 +135,69 @@ export default function Profile() {
   return (
     <Layout showBottomNav={false}>
       <div className="container mx-auto px-4 py-6 max-w-4xl space-y-8">
-        {/* Header */}
         <div className="text-center space-y-2">
           <h1 className="text-2xl font-heading font-bold">Mon profil</h1>
-          <p className="text-muted-foreground">
-            Gérez vos informations et consultez vos statistiques
-          </p>
+          <p className="text-muted-foreground">Gerez vos informations et consultez vos statistiques</p>
         </div>
 
-        {/* Statistiques */}
         <section className="space-y-4">
           <h2 className="text-xl font-heading font-semibold flex items-center gap-2">
             <TrendingUp className="h-5 w-5 text-primary" />
             Mes statistiques
           </h2>
-          
+
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Sessions totales
-                </CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Sessions totales</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-heading font-bold text-primary">
-                  {stats.totalSessions}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {stats.completedSessions} terminées
-                </p>
+                <div className="text-2xl font-heading font-bold text-primary">{stats.totalSessions}</div>
+                <p className="text-xs text-muted-foreground mt-1">{stats.completedSessions} terminees</p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Cette semaine
-                </CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Cette semaine</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-heading font-bold text-accent">
-                  {stats.weekSessions}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  sessions
-                </p>
+                <div className="text-2xl font-heading font-bold text-accent">{stats.weekSessions}</div>
+                <p className="text-xs text-muted-foreground mt-1">sessions</p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Ce mois
-                </CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Ce mois</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-heading font-bold text-primary">
-                  {stats.monthSessions}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  sessions
-                </p>
+                <div className="text-2xl font-heading font-bold text-primary">{stats.monthSessions}</div>
+                <p className="text-xs text-muted-foreground mt-1">sessions</p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Temps total
-                </CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Temps total</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-heading font-bold text-accent">
-                  {formatTime(stats.totalTimeMinutes)}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  d'activité
-                </p>
+                <div className="text-2xl font-heading font-bold text-accent">{formatTime(stats.totalTimeMinutes)}</div>
+                <p className="text-xs text-muted-foreground mt-1">d'activite</p>
               </CardContent>
             </Card>
           </div>
 
-          {/* Encouragement */}
           {stats.completedSessions > 0 && (
             <Card className="bg-gradient-primary border-0 text-primary-foreground">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <Award className="h-6 w-6" />
                   <div>
-                    <p className="font-medium">Félicitations !</p>
+                    <p className="font-medium">Felicitations</p>
                     <p className="text-sm opacity-90">
-                      Vous avez terminé {stats.completedSessions} session{stats.completedSessions > 1 ? 's' : ''}. 
-                      Continuez comme ça !
+                      Vous avez termine {stats.completedSessions} session
+                      {stats.completedSessions > 1 ? "s" : ""}. Continuez comme ca.
                     </p>
                   </div>
                 </div>
@@ -276,13 +206,12 @@ export default function Profile() {
           )}
         </section>
 
-        {/* Informations personnelles */}
         <section className="space-y-4">
           <h2 className="text-xl font-heading font-semibold flex items-center gap-2">
             <User className="h-5 w-5 text-primary" />
             Informations personnelles
           </h2>
-          
+
           <Card>
             <CardContent className="p-6 space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
@@ -291,7 +220,7 @@ export default function Profile() {
                   <Input
                     id="display-name"
                     value={profile.display_name}
-                    onChange={(e) => setProfile(prev => ({ ...prev, display_name: e.target.value }))}
+                    onChange={(event) => setProfile((prev) => ({ ...prev, display_name: event.target.value }))}
                     placeholder="Votre nom"
                   />
                 </div>
@@ -301,16 +230,12 @@ export default function Profile() {
                     id="email"
                     type="email"
                     value={profile.email}
-                    disabled
+                    onChange={(event) => setProfile((prev) => ({ ...prev, email: event.target.value }))}
                     placeholder="votre@email.com"
-                    className="opacity-60"
                   />
-                  <p className="text-xs text-muted-foreground">
-                    L'email ne peut pas être modifié ici. Utilisez les paramètres de votre compte.
-                  </p>
                 </div>
               </div>
-              
+
               <Button onClick={saveProfile} disabled={saving} className="w-full md:w-auto">
                 {saving ? "Sauvegarde..." : "Sauvegarder"}
               </Button>
@@ -318,21 +243,18 @@ export default function Profile() {
           </Card>
         </section>
 
-        {/* Paramètres */}
         <section className="space-y-4">
           <h2 className="text-xl font-heading font-semibold flex items-center gap-2">
             <Settings className="h-5 w-5 text-primary" />
-            Paramètres
+            Parametres
           </h2>
-          
+
           <Card>
             <CardContent className="p-6 space-y-6">
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
-                  <Label>Durée des sessions</Label>
-                  <CardDescription>
-                    Durée par défaut de vos sessions de travail
-                  </CardDescription>
+                  <Label>Duree des sessions</Label>
+                  <CardDescription>Duree par defaut de vos sessions de travail</CardDescription>
                 </div>
                 <div className="flex gap-2">
                   <Button
@@ -357,32 +279,24 @@ export default function Profile() {
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
                   <Label>Notifications</Label>
-                  <CardDescription>
-                    Recevoir des rappels pour les pauses
-                  </CardDescription>
+                  <CardDescription>Recevoir des rappels pour les pauses</CardDescription>
                 </div>
-                <Switch
-                  checked={notificationsEnabled}
-                  onCheckedChange={setNotificationsEnabled}
-                />
+                <Switch checked={notificationsEnabled} onCheckedChange={setNotificationsEnabled} />
               </div>
             </CardContent>
           </Card>
         </section>
 
-        {/* Actions */}
         <section className="space-y-4">
           <Card className="border-destructive/20">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
                   <Label className="text-destructive">Zone de danger</Label>
-                  <CardDescription>
-                    Déconnectez-vous de votre compte
-                  </CardDescription>
+                  <CardDescription>Deconnectez-vous de votre compte local</CardDescription>
                 </div>
-                <Button variant="destructive" onClick={handleSignOut}>
-                  Se déconnecter
+                <Button variant="destructive" onClick={signOut}>
+                  Se deconnecter
                 </Button>
               </div>
             </CardContent>

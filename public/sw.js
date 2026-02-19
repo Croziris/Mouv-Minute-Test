@@ -59,10 +59,8 @@ self.addEventListener('activate', (event) => {
 // Stratégie de mise en cache pour les requêtes
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  const url = new URL(request.url);
-  
-  // Ignorer les requêtes non-HTTP et les APIs externes (Supabase)
-  if (!request.url.startsWith('http') || url.hostname.includes('supabase')) {
+  // Ignorer les requetes non-HTTP
+  if (!request.url.startsWith('http')) {
     return;
   }
   
