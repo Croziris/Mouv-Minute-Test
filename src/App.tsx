@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -15,12 +15,22 @@ import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import ArchivesConseils from "./pages/ArchivesConseils";
+import { pb } from "@/lib/pocketbase";
 
 import Session from "./pages/Session";
 
 const queryClient = new QueryClient();
 
 const App = () => {
+  useEffect(() => {
+    console.log("PocketBase URL:", pb.baseUrl);
+    pb
+      .collection("exercises")
+      .getFullList()
+      .then((data) => console.log("✅ PocketBase OK, exercices:", data))
+      .catch((err) => console.error("❌ Erreur PocketBase:", err));
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>

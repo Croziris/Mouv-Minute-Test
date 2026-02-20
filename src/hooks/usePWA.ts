@@ -187,29 +187,31 @@ export function usePWA() {
   }, [pwaState.supportsNotifications]);
 
   // Fonction pour s'abonner aux notifications push
-  const subscribeToNotifications = useCallback(async () => {
-    if (!pwaState.swRegistration) {
-      console.error('[PWA] No service worker registration');
-      return null;
-    }
+const subscribeToNotifications = useCallback(async () => {
+  if (!pwaState.swRegistration) {
+    console.error('[PWA] No service worker registration')
+    return null
+  }
 
-    try {
-      const subscription = await pwaState.swRegistration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: null, // À remplacer par votre clé VAPID publique
-      });
+  try {
+    const subscription = await pwaState.swRegistration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: null, // À remplacer par ta clé VAPID plus tard
+    })
 
-      console.log('[PWA] Push subscription:', subscription);
-      
-      // Ici vous pourriez envoyer l'abonnement à votre backend Supabase
-      // via une Edge Function pour le stocker
-      
-      return subscription;
-    } catch (error) {
-      console.error('[PWA] Push subscription failed:', error);
-      return null;
-    }
-  }, [pwaState.swRegistration]);
+    console.log('[PWA] Push subscription:', subscription)
+
+    // ✅ Sauvegarde dans PocketBase
+    const { pushService } = await import('@/lib/pocketbase')
+    await pushService.save(subscription)
+    console.log('[PWA] Subscription saved to PocketBase ✅')
+
+    return subscription
+  } catch (error) {
+    console.error('[PWA] Push subscription failed:', error)
+    return null
+  }
+}, [pwaState.swRegistration])
 
   // Fonction pour envoyer une notification locale
   const showLocalNotification = useCallback((title: string, options: NotificationOptions = {}) => {

@@ -9,17 +9,14 @@ const STATIC_CACHE_URLS = [
   '/timer',
   '/exercises',
   '/profile',
-  '/static/js/bundle.js',
-  '/static/css/main.css',
   '/icon-192.png',
   '/icon-512.png',
   '/manifest.json'
 ];
 
-// Installation du Service Worker
+// Installation
 self.addEventListener('install', (event) => {
   console.log('[SW] Installing service worker...');
-  
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
@@ -30,15 +27,12 @@ self.addEventListener('install', (event) => {
         console.warn('[SW] Failed to cache static resources:', error);
       })
   );
-  
-  // Forcer l'activation immédiate
   self.skipWaiting();
 });
 
-// Activation du Service Worker
+// Activation
 self.addEventListener('activate', (event) => {
   console.log('[SW] Activating service worker...');
-  
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -51,60 +45,55 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
-  
-  // Prendre le contrôle de tous les onglets immédiatement
   self.clients.claim();
 });
 
-// Stratégie de mise en cache pour les requêtes
+// Fetch
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  // Ignorer les requetes non-HTTP
-  if (!request.url.startsWith('http')) {
+
+  if (!request.url.startsWith('http')) return;
+
+  // Ignorer les appels API PocketBase et Notion (toujours réseau)
+  if (
+    request.url.includes('pocketbase') ||
+    request.url.includes('pb-mouv') ||
+    request.url.includes('api.notion.com')
+  ) {
     return;
   }
-  
-  // Stratégie Cache First pour les ressources statiques
-  if (request.destination === 'script' || 
-      request.destination === 'style' || 
-      request.destination === 'image' ||
-      request.url.includes('/static/')) {
-    
+
+  // Cache First pour ressources statiques
+  if (
+    request.destination === 'script' ||
+    request.destination === 'style' ||
+    request.destination === 'image' ||
+    request.url.includes('/static/')
+  ) {
     event.respondWith(
-      caches.match(request)
-        .then((response) => {
-          if (response) {
-            return response;
-          }
-          return fetch(request).then((fetchResponse) => {
-            const responseClone = fetchResponse.clone();
-            caches.open(CACHE_NAME)
-              .then((cache) => {
-                cache.put(request, responseClone);
-              });
-            return fetchResponse;
+      caches.match(request).then((response) => {
+        if (response) return response;
+        return fetch(request).then((fetchResponse) => {
+          const responseClone = fetchResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(request, responseClone);
           });
-        })
-        .catch(() => {
-          // Fallback pour les images
-          if (request.destination === 'image') {
-            return caches.match('https://storage.googleapis.com/gpt-engineer-file-uploads/3ui3tQZhwnRq3geG5ea8cbS2Pf32/uploads/1758102737279-Logo app mouv'minute.png');
-          }
-        })
+          return fetchResponse;
+        });
+      })
     );
     return;
   }
-  
-  // Stratégie Network First pour les pages HTML
+
+  // Network First pour pages HTML
   if (request.destination === 'document') {
     event.respondWith(
       fetch(request)
         .then((response) => {
           const responseClone = response.clone();
-          caches.open(CACHE_NAME)
-            .then((cache) => {
-              cache.put(request, responseClone);
-            });
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(request, responseClone);
+          });
           return response;
         })
         .catch(() => {
@@ -117,23 +106,19 @@ self.addEventListener('fetch', (event) => {
   }
 });
 
-// Gestionnaire d'événements push
-self.addEventListener('push', event => {
-  console.log('Push event received:', event);
-  
-  if (!event.data) {
-    console.log('No data in push event');
-    return;
-  }
+// Push notification
+self.addEventListener('push', (event) => {
+  console.log('[SW] Push event received:', event);
+  if (!event.data) return;
 
   try {
     const data = event.data.json();
-    console.log('Push data:', data);
-    
-    const notificationOptions = {
-      body: data.body || 'C\'est l\'heure de faire quelques exercices !',
-      icon: data.icon || '/Logo.png',
-      badge: data.badge || '/Logo.png',
+
+    const title = data.title || "Mouv Minute - Temps de pause !";
+    const options = {
+      body: data.body || "C'est l'heure de faire quelques exercices !",
+      icon: data.icon || '/icon-192.png',
+      badge: data.badge || '/icon-192.png',
       tag: data.tag || 'mouv-minute-notification',
       requireInteraction: data.requireInteraction || true,
       actions: data.actions || [
@@ -143,24 +128,19 @@ self.addEventListener('push', event => {
       data: data.data || { url: '/timer' }
     };
 
-    const title = data.title || 'Mouv\'Minute - Temps de pause !';
-    
-    event.waitUntil(
-      self.registration.showNotification(title, notificationOptions)
-    );
+    event.waitUntil(self.registration.showNotification(title, options));
+
   } catch (error) {
-    console.error('Error handling push event:', error);
-    
-    // Fallback notification
+    console.error('[SW] Error handling push event:', error);
     event.waitUntil(
-      self.registration.showNotification('Mouv\'Minute - Temps de pause !', {
-        body: 'C\'est l\'heure de faire quelques exercices !',
-        icon: '/Logo.png',
-        badge: '/Logo.png',
+      self.registration.showNotification("Mouv Minute - Temps de pause !", {
+        body: "C'est l'heure de faire quelques exercices !",
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
         tag: 'mouv-minute-fallback',
         requireInteraction: true,
         actions: [
-          { action: 'open', title: 'Ouvrir l\'app' },
+          { action: 'open', title: "Ouvrir l'app" },
           { action: 'dismiss', title: 'Fermer' }
         ],
         data: { url: '/timer' }
@@ -169,59 +149,40 @@ self.addEventListener('push', event => {
   }
 });
 
-// Gestionnaire de clic sur notification
-self.addEventListener('notificationclick', event => {
-  console.log('Notification clicked:', event);
-  
+// Clic sur notification
+self.addEventListener('notificationclick', (event) => {
+  console.log('[SW] Notification clicked:', event);
   event.notification.close();
-  
+
   const action = event.action;
-  const notificationData = event.notification.data || {};
-  const url = notificationData.url || '/timer';
-  
-  if (action === 'dismiss') {
-    // Ne rien faire, juste fermer
-    return;
-  }
-  
-  // Ouvrir ou focuser la fenêtre de l'app
+  const url = event.notification.data?.url || '/timer';
+
+  if (action === 'dismiss') return;
+
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
-      // Chercher une fenêtre existante
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
         if (client.url.includes(self.location.origin)) {
-          // Naviguer vers l'URL appropriée si nécessaire
           if (url && !client.url.includes(url)) {
-            return client.navigate(url).then(client => client?.focus());
+            return client.navigate(url).then((c) => c?.focus());
           }
           return client.focus();
         }
       }
-      
-      // Ouvrir une nouvelle fenêtre si aucune n'existe
-      const fullUrl = self.location.origin + url;
-      return clients.openWindow(fullUrl);
-    }).catch(error => {
-      console.error('Error handling notification click:', error);
-      // Fallback: ouvrir juste la page d'accueil
-      return clients.openWindow(self.location.origin);
+      return clients.openWindow(self.location.origin + url);
     })
   );
 });
 
-// Gestion des erreurs
+// Erreurs
 self.addEventListener('error', (event) => {
-  console.error('[SW] Service worker error:', event.error);
+  console.error('[SW] Error:', event.error);
 });
 
-// Synchronisation en arrière-plan (pour futures fonctionnalités)
+// Background sync
 self.addEventListener('sync', (event) => {
   console.log('[SW] Background sync:', event.tag);
-  
   if (event.tag === 'sync-sessions') {
-    event.waitUntil(
-      // Ici on pourrait synchroniser les sessions en attente
-      console.log('[SW] Syncing pending sessions...')
-    );
+    console.log('[SW] Syncing pending sessions...');
   }
 });

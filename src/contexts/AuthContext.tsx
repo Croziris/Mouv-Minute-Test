@@ -1,17 +1,13 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { toast } from "@/hooks/use-toast";
+import { pb } from "@/lib/pocketbase";
 
 export interface AppUser {
   id: string;
   email: string;
   displayName: string;
-}
-
-interface StoredUser {
-  id: string;
-  email: string;
-  password: string;
-  displayName: string;
+  role: string;
+  subscription_status: string;
 }
 
 interface AuthContextType {
@@ -25,142 +21,143 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const USERS_KEY = "mouv-minute-users";
-const ACTIVE_USER_KEY = "mouv-minute-active-user";
-
-const safeParse = <T,>(value: string | null, fallback: T): T => {
-  if (!value) return fallback;
-  try {
-    return JSON.parse(value) as T;
-  } catch {
-    return fallback;
-  }
-};
-
-const getStoredUsers = (): StoredUser[] =>
-  safeParse<StoredUser[]>(localStorage.getItem(USERS_KEY), []);
-
-const setStoredUsers = (users: StoredUser[]) => {
-  localStorage.setItem(USERS_KEY, JSON.stringify(users));
-};
-
-const toAppUser = (stored: StoredUser): AppUser => ({
-  id: stored.id,
-  email: stored.email,
-  displayName: stored.displayName,
+const toAppUser = (model: any): AppUser => ({
+  id: model.id,
+  email: model.email,
+  displayName: model.display_name || model.name || model.email.split("@")[0],
+  role: model.role || "user",
+  subscription_status: model.subscription_status || "free",
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Restaurer la session PocketBase au démarrage
   useEffect(() => {
-    const activeUser = safeParse<AppUser | null>(localStorage.getItem(ACTIVE_USER_KEY), null);
-    setUser(activeUser);
+    if (pb.authStore.isValid && pb.authStore.model) {
+      setUser(toAppUser(pb.authStore.model));
+    }
     setLoading(false);
+
+    // Écouter les changements d'auth (token expiré, déconnexion...)
+    const unsubscribe = pb.authStore.onChange((token, model) => {
+      if (model) {
+        setUser(toAppUser(model));
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const signUp = async (email: string, password: string, displayName?: string) => {
-    const normalizedEmail = email.trim().toLowerCase();
-    const users = getStoredUsers();
-    const existing = users.find((stored) => stored.email.toLowerCase() === normalizedEmail);
+    try {
+      await pb.collection("users").create({
+        email: email.trim().toLowerCase(),
+        password,
+        passwordConfirm: password,
+        display_name: displayName?.trim() || email.split("@")[0],
+        role: "user",
+        subscription_status: "free",
+      });
 
-    if (existing) {
-      const error = new Error("Un compte existe deja avec cet email.");
+      // Connexion automatique après inscription
+      const auth = await pb.collection("users").authWithPassword(
+        email.trim().toLowerCase(),
+        password
+      );
+
+      setUser(toAppUser(auth.record));
+
+      toast({
+        title: "Compte créé",
+        description: "Bienvenue sur Mouv'Minute !",
+      });
+
+      return { error: null };
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.email?.message === "The email is invalid or already in use."
+          ? "Un compte existe déjà avec cet email."
+          : err?.message || "Erreur lors de l'inscription.";
+
       toast({
         title: "Inscription impossible",
-        description: error.message,
+        description: message,
         variant: "destructive",
       });
-      return { error };
+
+      return { error: err };
     }
-
-    const created: StoredUser = {
-      id: crypto.randomUUID(),
-      email: normalizedEmail,
-      password,
-      displayName: displayName?.trim() || normalizedEmail.split("@")[0],
-    };
-
-    users.push(created);
-    setStoredUsers(users);
-    const active = toAppUser(created);
-    localStorage.setItem(ACTIVE_USER_KEY, JSON.stringify(active));
-    setUser(active);
-
-    toast({
-      title: "Compte cree",
-      description: "Connexion locale active.",
-    });
-
-    return { error: null };
   };
 
   const signIn = async (email: string, password: string) => {
-    const normalizedEmail = email.trim().toLowerCase();
-    const users = getStoredUsers();
-    const found = users.find(
-      (stored) => stored.email.toLowerCase() === normalizedEmail && stored.password === password
-    );
+    try {
+      const auth = await pb.collection("users").authWithPassword(
+        email.trim().toLowerCase(),
+        password
+      );
 
-    if (!found) {
-      const error = new Error("Email ou mot de passe invalide.");
+      setUser(toAppUser(auth.record));
+
+      toast({
+        title: "Connecté",
+        description: `Bon retour, ${toAppUser(auth.record).displayName} !`,
+      });
+
+      return { error: null };
+    } catch (err: any) {
       toast({
         title: "Connexion impossible",
-        description: error.message,
+        description: "Email ou mot de passe invalide.",
         variant: "destructive",
       });
-      return { error };
-    }
 
-    const active = toAppUser(found);
-    localStorage.setItem(ACTIVE_USER_KEY, JSON.stringify(active));
-    setUser(active);
-    return { error: null };
+      return { error: err };
+    }
   };
 
   const signOut = async () => {
-    localStorage.removeItem(ACTIVE_USER_KEY);
+    pb.authStore.clear();
     setUser(null);
+    toast({
+      title: "Déconnecté",
+      description: "À bientôt !",
+    });
     return { error: null };
   };
 
   const updateProfile = async (updates: Partial<Pick<AppUser, "displayName" | "email">>) => {
-    if (!user) {
-      return { error: new Error("Aucun utilisateur connecte.") };
+    if (!user) return { error: new Error("Aucun utilisateur connecté.") };
+
+    try {
+      const updated = await pb.collection("users").update(user.id, {
+        display_name: updates.displayName?.trim(),
+        email: updates.email?.trim().toLowerCase(),
+      });
+
+      setUser(toAppUser(updated));
+
+      toast({
+        title: "Profil mis à jour",
+        description: "Vos modifications ont été enregistrées.",
+      });
+
+      return { error: null };
+    } catch (err: any) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de mettre à jour le profil.",
+        variant: "destructive",
+      });
+      return { error: err };
     }
-
-    const users = getStoredUsers();
-    const index = users.findIndex((stored) => stored.id === user.id);
-    if (index === -1) {
-      return { error: new Error("Utilisateur introuvable.") };
-    }
-
-    const nextStored: StoredUser = {
-      ...users[index],
-      displayName: updates.displayName?.trim() || users[index].displayName,
-      email: updates.email?.trim().toLowerCase() || users[index].email,
-    };
-
-    users[index] = nextStored;
-    setStoredUsers(users);
-
-    const nextUser = toAppUser(nextStored);
-    localStorage.setItem(ACTIVE_USER_KEY, JSON.stringify(nextUser));
-    setUser(nextUser);
-
-    return { error: null };
   };
 
   const value = useMemo(
-    () => ({
-      user,
-      loading,
-      signUp,
-      signIn,
-      signOut,
-      updateProfile,
-    }),
+    () => ({ user, loading, signUp, signIn, signOut, updateProfile }),
     [user, loading]
   );
 
