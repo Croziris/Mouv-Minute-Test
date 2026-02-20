@@ -58,7 +58,9 @@ self.addEventListener('fetch', (event) => {
   if (
     request.url.includes('pocketbase') ||
     request.url.includes('pb-mouv') ||
-    request.url.includes('api.notion.com')
+    request.url.includes('/api/pb') ||
+    request.url.includes('api.notion.com') ||
+    request.url.includes('/api/notion')
   ) {
     return;
   }

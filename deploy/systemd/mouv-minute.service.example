@@ -1,0 +1,15 @@
+[Unit]
+Description=Mouv Minute frontend + API proxies
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/var/www/mouv-minute
+EnvironmentFile=/var/www/mouv-minute/.env.production
+ExecStart=/usr/bin/npm run start:prod
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

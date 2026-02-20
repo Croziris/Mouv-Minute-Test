@@ -71,3 +71,63 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+
+## API proxy and deployment (VPS + Nginx)
+
+The frontend uses same-origin API routes:
+
+- `/api/pb/*` -> PocketBase
+- `/api/notion/*` -> Notion (secret kept server-side)
+
+This avoids browser CORS issues in dev and production.
+
+### Environment variables
+
+Client-side:
+
+- `VITE_POCKETBASE_URL=/api/pb`
+- `VITE_NOTION_PROXY_BASE_URL=/api/notion`
+
+Server-side only:
+
+- `POCKETBASE_TARGET_URL=https://your-pocketbase-instance`
+- `NOTION_API_KEY=secret_xxx`
+- `NOTION_DB_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
+- `NOTION_ALLOWED_APP=mouv minute`
+
+### Production run
+
+```bash
+npm ci
+npm run build
+npm run start:prod
+```
+
+`start:prod` runs `vite preview` on `127.0.0.1:4173` with both API proxies enabled.
+
+### Nginx reverse proxy example
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:4173;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+Ready-to-copy templates are available in:
+
+- `deploy/nginx/mouv-minute.conf.example`
+- `deploy/systemd/mouv-minute.service.example`
+
+For Notion publishing visibility:
+
+- Status must be `Publie` (or checkbox equivalent)
+- `Application` multi-select must contain `mouv minute` (or your `NOTION_ALLOWED_APP` value)

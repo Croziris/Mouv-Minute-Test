@@ -1,7 +1,15 @@
 import PocketBase from 'pocketbase'
 
+const configuredPocketBaseUrl = (import.meta.env.VITE_POCKETBASE_URL || '').trim()
+
+const pocketBaseUrl =
+  /^https?:\/\//i.test(configuredPocketBaseUrl)
+    ? '/api/pb'
+    : configuredPocketBaseUrl || '/api/pb'
+
+
 // Instance unique PocketBase partagée dans toute l'app
-export const pb = new PocketBase(import.meta.env.VITE_POCKETBASE_URL)
+export const pb = new PocketBase(pocketBaseUrl)
 pb.autoCancellation(false)
 
 // ============================================================
