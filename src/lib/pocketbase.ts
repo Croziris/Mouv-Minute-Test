@@ -2,6 +2,7 @@ import PocketBase from 'pocketbase'
 
 // Instance unique PocketBase partagée dans toute l'app
 export const pb = new PocketBase(import.meta.env.VITE_POCKETBASE_URL)
+pb.autoCancellation(false)
 
 // ============================================================
 // TYPES
@@ -11,6 +12,16 @@ export interface Exercise {
   id: string
   title: string
   zone: 'nuque' | 'epaules' | 'dos' | 'trapezes' | 'tronc' | 'jambes' | 'general'
+  duration_sec: number
+  youtube_id: string
+  thumb_url: string
+  description_public: string
+  notes_kine: string
+}
+
+export interface ExercisePayload {
+  title: string
+  zone: Exercise['zone']
   duration_sec: number
   youtube_id: string
   thumb_url: string
@@ -122,12 +133,28 @@ export const exerciseService = {
     return await pb.collection('exercises').getFullList<Exercise>({
       filter,
       sort: 'title',
+      requestKey: null,
     })
   },
 
   // Récupérer un exercice par ID
   async getById(id: string) {
     return await pb.collection('exercises').getOne<Exercise>(id)
+  },
+
+  // Creer un exercice
+  async create(payload: ExercisePayload) {
+    return await pb.collection('exercises').create<Exercise>(payload)
+  },
+
+  // Mettre a jour un exercice
+  async update(id: string, payload: ExercisePayload) {
+    return await pb.collection('exercises').update<Exercise>(id, payload)
+  },
+
+  // Supprimer un exercice
+  async remove(id: string) {
+    return await pb.collection('exercises').delete(id)
   },
 }
 

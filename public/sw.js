@@ -3,7 +3,7 @@
  * Gère le cache des ressources statiques et le mode hors connexion basique
  */
 
-const CACHE_NAME = 'mouvminute-v1.0.0';
+const CACHE_NAME = 'mouvminute-v1.0.1';
 const STATIC_CACHE_URLS = [
   '/',
   '/timer',

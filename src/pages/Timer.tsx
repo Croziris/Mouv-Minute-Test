@@ -11,6 +11,7 @@ import { usePWA } from "@/hooks/usePWA";
 import { ExerciseTimer } from "@/components/ExerciseTimer";
 import { programService, exerciseService, sessionService, Exercise, Program } from "@/lib/pocketbase";
 import { useAuth } from "@/contexts/AuthContext";
+import { buildYouTubeEmbedUrl } from "@/lib/youtube";
 
 type TimerState = "stopped" | "running" | "paused" | "break";
 
@@ -379,7 +380,9 @@ export default function Timer() {
 
             {breakExercises.length > 0 ? (
               <div className="space-y-4">
-                {breakExercises.map((exercise) => (
+                {breakExercises.map((exercise) => {
+                  const embedUrl = buildYouTubeEmbedUrl(exercise.youtube_id);
+                  return (
                   <Card
                     key={exercise.id}
                     className={completedExercises.includes(exercise.id)
@@ -408,10 +411,10 @@ export default function Timer() {
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      {exercise.youtube_id ? (
+                      {embedUrl ? (
                         <div className="rounded-lg overflow-hidden bg-black/5">
                           <iframe
-                            src={`https://www.youtube.com/embed/${exercise.youtube_id}?autoplay=1&loop=1&playlist=${exercise.youtube_id}`}
+                            src={embedUrl}
                             title={exercise.title}
                             className="w-full aspect-video"
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -454,7 +457,8 @@ export default function Timer() {
                       />
                     </CardContent>
                   </Card>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <Card>

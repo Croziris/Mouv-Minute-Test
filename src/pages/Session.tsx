@@ -9,6 +9,7 @@ import { toast } from "@/hooks/use-toast";
 import { ExerciseTimer } from "@/components/ExerciseTimer";
 import { programService, sessionService, Exercise, ProgramExercise } from "@/lib/pocketbase";
 import { useAuth } from "@/contexts/AuthContext";
+import { buildYouTubeEmbedUrl } from "@/lib/youtube";
 
 export default function Session() {
   const { programId } = useParams<{ programId: string }>();
@@ -82,6 +83,7 @@ export default function Session() {
   const progress = (completedExercises.length / exercises.length) * 100;
   const currentEx = exercises[currentExercise];
   const currentExData: Exercise | null = (currentEx as any)?.expand?.exercise || null;
+  const currentEmbedUrl = buildYouTubeEmbedUrl(currentExData?.youtube_id);
   const isCurrentCompleted = currentEx ? completedExercises.includes(currentEx.id) : false;
   const canGoNext = isCurrentCompleted && currentExercise < exercises.length - 1;
   const canFinish = completedExercises.length === exercises.length;
@@ -169,10 +171,10 @@ export default function Session() {
               <CardContent className="space-y-4">
 
                 {/* Miniature / vidéo */}
-                {currentExData.youtube_id ? (
+                {currentEmbedUrl ? (
                   <div className="w-full rounded-lg overflow-hidden bg-black/5">
                     <iframe
-                      src={`https://www.youtube.com/embed/${currentExData.youtube_id}?autoplay=1&loop=1&playlist=${currentExData.youtube_id}`}
+                      src={currentEmbedUrl}
                       title={currentExData.title}
                       className="w-full aspect-video"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"

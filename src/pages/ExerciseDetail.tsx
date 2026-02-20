@@ -8,6 +8,7 @@ import { Layout } from "@/components/layout/Layout";
 import { ExerciseTimer } from "@/components/ExerciseTimer";
 import { toast } from "@/hooks/use-toast";
 import { exerciseService, Exercise } from "@/lib/pocketbase";
+import { buildYouTubeEmbedUrl } from "@/lib/youtube";
 
 const zoneConfig = {
   nuque:    { label: "Nuque",    color: "bg-primary/10 text-primary" },
@@ -67,10 +68,7 @@ export default function ExerciseDetail() {
 
   const config = zoneConfig[exercise.zone as keyof typeof zoneConfig];
 
-  // URL YouTube embed depuis l'ID
-  const youtubeEmbed = exercise.youtube_id
-    ? `https://www.youtube.com/embed/${exercise.youtube_id}?autoplay=1&loop=1&playlist=${exercise.youtube_id}`
-    : null;
+  const youtubeEmbed = buildYouTubeEmbedUrl(exercise.youtube_id);
 
   return (
     <Layout>

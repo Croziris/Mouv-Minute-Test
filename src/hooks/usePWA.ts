@@ -39,7 +39,7 @@ export function usePWA() {
     const initializePWA = async () => {
       // Détecter si l'app est en mode standalone (déjà installée)
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
-                           (window.navigator as any).standalone === true;
+                           (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
 
       // Vérifier le support des notifications
       const supportsNotifications = 'Notification' in window;
@@ -55,6 +55,24 @@ export function usePWA() {
 
       // Enregistrer le Service Worker
       if ('serviceWorker' in navigator) {
+        if (import.meta.env.DEV) {
+          try {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(registrations.map((registration) => registration.unregister()));
+
+            if ('caches' in window) {
+              const cacheNames = await caches.keys();
+              await Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName)));
+            }
+
+            console.log('[PWA] Service Worker disabled in dev mode');
+          } catch (error) {
+            console.warn('[PWA] Failed to cleanup Service Worker in dev mode:', error);
+          }
+
+          return;
+        }
+
         try {
           const registration = await navigator.serviceWorker.register('/sw.js');
           console.log('[PWA] Service Worker registered:', registration);

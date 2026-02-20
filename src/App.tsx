@@ -1,11 +1,10 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
-import Index from "./pages/Index";
 import Home from "./pages/Home";
 import Timer from "./pages/Timer";
 import Exercises from "./pages/Exercises";
@@ -15,22 +14,11 @@ import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import ArchivesConseils from "./pages/ArchivesConseils";
-import { pb } from "@/lib/pocketbase";
-
 import Session from "./pages/Session";
 
 const queryClient = new QueryClient();
 
 const App = () => {
-  useEffect(() => {
-    console.log("PocketBase URL:", pb.baseUrl);
-    pb
-      .collection("exercises")
-      .getFullList()
-      .then((data) => console.log("✅ PocketBase OK, exercices:", data))
-      .catch((err) => console.error("❌ Erreur PocketBase:", err));
-  }, []);
-
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
@@ -46,7 +34,6 @@ const App = () => {
               <Route path="/archives-conseils" element={<ArchivesConseils />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/auth" element={<Auth />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
