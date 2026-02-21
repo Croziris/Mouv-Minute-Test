@@ -147,7 +147,7 @@ function resolveImageUrl(page: Record<string, unknown>): string {
 
   const coverProperty = asRecord(properties.Cover);
   const coverPropertyUrl = typeof coverProperty?.url === "string" ? coverProperty.url : "";
-  if (coverPropertyUrl && !coverPropertyUrl.startsWith("data:")) {
+  if (coverPropertyUrl.trim()) {
     return coverPropertyUrl;
   }
 
@@ -295,6 +295,16 @@ export async function fetchNotionArticles(limit?: number): Promise<NotionArticle
       return page ? mapPageToPreview(page) : null;
     })
     .filter((article): article is NotionArticlePreview => Boolean(article));
+
+  articles.sort((a, b) => {
+    const aTimestamp = a.publishedAt ? new Date(a.publishedAt).getTime() : Number.NEGATIVE_INFINITY;
+    const bTimestamp = b.publishedAt ? new Date(b.publishedAt).getTime() : Number.NEGATIVE_INFINITY;
+
+    const safeATimestamp = Number.isFinite(aTimestamp) ? aTimestamp : Number.NEGATIVE_INFINITY;
+    const safeBTimestamp = Number.isFinite(bTimestamp) ? bTimestamp : Number.NEGATIVE_INFINITY;
+
+    return safeBTimestamp - safeATimestamp;
+  });
 
   const safeLimit = typeof limit === "number" && Number.isFinite(limit) ? Math.max(1, Math.floor(limit)) : null;
   return safeLimit ? articles.slice(0, safeLimit) : articles;
