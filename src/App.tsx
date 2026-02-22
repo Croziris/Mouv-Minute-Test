@@ -12,6 +12,7 @@ import ExerciseDetail from "./pages/ExerciseDetail";
 import ArticleDetail from "./pages/ArticleDetail";
 import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
+import ConfirmPasswordReset from "./pages/ConfirmPasswordReset";
 import NotFound from "./pages/NotFound";
 import ArchivesConseils from "./pages/ArchivesConseils";
 import Session from "./pages/Session";
@@ -34,6 +35,7 @@ const App = () => {
               <Route path="/archives-conseils" element={<ArchivesConseils />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/confirm-password-reset" element={<ConfirmPasswordReset />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
