@@ -4,8 +4,6 @@ import { Loader2 } from "lucide-react";
 import { pb } from "@/lib/pocketbase";
 import { useAuth } from "@/contexts/AuthContext";
 
-const OAUTH2_CALLBACK_URL = "https://app1.crozier-pierre.fr/oauth2-callback";
-
 const clearOAuth2SessionStorage = () => {
   sessionStorage.removeItem("pb_oauth2_state");
   sessionStorage.removeItem("pb_oauth2_verifier");
@@ -42,7 +40,7 @@ export default function OAuth2Callback() {
           "google",
           code,
           codeVerifier,
-          OAUTH2_CALLBACK_URL,
+          "https://app1.crozier-pierre.fr/oauth2-callback",
           { createData: {} }
         );
 
