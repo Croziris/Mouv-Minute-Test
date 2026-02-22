@@ -212,6 +212,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signInWithGoogle = async () => {
     try {
+      console.log("PB URL:", import.meta.env.VITE_POCKETBASE_URL);
+      console.log(
+        "OAuth2 redirect URI attendue:",
+        import.meta.env.VITE_POCKETBASE_URL + "/api/oauth2-redirect"
+      );
+
       const auth = await pb.collection("users").authWithOAuth2({
         provider: "google",
       });
