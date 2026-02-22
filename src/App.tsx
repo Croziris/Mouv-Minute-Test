@@ -13,6 +13,7 @@ import ArticleDetail from "./pages/ArticleDetail";
 import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
 import ConfirmPasswordReset from "./pages/ConfirmPasswordReset";
+import OAuth2Callback from "./pages/OAuth2Callback";
 import NotFound from "./pages/NotFound";
 import ArchivesConseils from "./pages/ArchivesConseils";
 import Session from "./pages/Session";
@@ -36,6 +37,7 @@ const App = () => {
               <Route path="/profile" element={<Profile />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/confirm-password-reset" element={<ConfirmPasswordReset />} />
+              <Route path="/oauth2-callback" element={<OAuth2Callback />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
