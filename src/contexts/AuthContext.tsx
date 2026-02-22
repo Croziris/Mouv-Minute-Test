@@ -16,6 +16,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, displayName?: string) => Promise<{ error: unknown | null }>;
   signIn: (email: string, password: string) => Promise<{ error: unknown | null }>;
   signInWithGoogle: () => Promise<{ error: unknown | null }>;
+  setUserFromRecord: (record: unknown) => void;
   requestOtp: (email: string) => Promise<{ error: unknown | null; otpId: string | null }>;
   signInWithOtp: (otpId: string, otpCode: string) => Promise<{ error: unknown | null }>;
   signOut: () => Promise<{ error: unknown | null }>;
@@ -68,38 +69,6 @@ const toAppUser = (model: unknown): AppUser => {
     subscription_status:
       typeof safeModel.subscription_status === "string" ? safeModel.subscription_status : "free",
   };
-};
-
-const getGoogleAuthErrorMessage = (err: unknown): string => {
-  const pocketErr = toPocketBaseError(err);
-  const message = [
-    pocketErr.message,
-    pocketErr.response?.message,
-    pocketErr.originalError?.message,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-
-  if (
-    message.includes("popup_blocked") ||
-    message.includes("popup blocked") ||
-    message.includes("not in a browser context")
-  ) {
-    return "La popup Google est bloquee. Autorisez les popups puis reessayez.";
-  }
-
-  if (
-    pocketErr.isAbort ||
-    message.includes("abort") ||
-    message.includes("cancel") ||
-    message.includes("oauth2 redirect error") ||
-    message.includes("state parameters don't match")
-  ) {
-    return "Connexion Google annulee.";
-  }
-
-  return "Impossible de se connecter avec Google pour le moment.";
 };
 
 const getOtpRequestErrorMessage = (err: unknown): string => {
@@ -210,30 +179,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const setUserFromRecord = (record: unknown) => {
+    setUser(toAppUser(record));
+  };
+
   const signInWithGoogle = async () => {
     try {
-      console.log("PB URL:", import.meta.env.VITE_POCKETBASE_URL);
-      console.log(
-        "OAuth2 redirect URI attendue:",
-        import.meta.env.VITE_POCKETBASE_URL + "/api/oauth2-redirect"
+      const methods = await pb.collection("users").listAuthMethods();
+      const google = methods.oauth2?.providers?.find(
+        (p: { name: string }) => p.name === "google"
       );
+      if (!google) throw new Error("Google provider non disponible");
 
-      const auth = await pb.collection("users").authWithOAuth2({
-        provider: "google",
-      });
+      sessionStorage.setItem("pb_oauth2_state", google.state);
+      sessionStorage.setItem("pb_oauth2_verifier", google.codeVerifier);
+      sessionStorage.setItem("pb_oauth2_provider", "google");
 
-      setUser(toAppUser(auth.record));
-
-      toast({
-        title: "Connecte",
-        description: `Bon retour, ${toAppUser(auth.record).displayName} !`,
-      });
+      window.location.href = google.authURL;
 
       return { error: null };
     } catch (err: unknown) {
       toast({
         title: "Connexion Google impossible",
-        description: getGoogleAuthErrorMessage(err),
+        description: "Impossible de contacter Google.",
         variant: "destructive",
       });
 
@@ -339,6 +307,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signUp,
     signIn,
     signInWithGoogle,
+    setUserFromRecord,
     requestOtp,
     signInWithOtp,
     signOut,
