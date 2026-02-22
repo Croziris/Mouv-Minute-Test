@@ -70,8 +70,6 @@ const toAppUser = (model: unknown): AppUser => {
   };
 };
 
-const GOOGLE_POPUP_FEATURES = "width=500,height=700,resizable,menubar=no";
-
 const getGoogleAuthErrorMessage = (err: unknown): string => {
   const pocketErr = toPocketBaseError(err);
   const message = [
@@ -213,27 +211,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signInWithGoogle = async () => {
-    let popup: Window | null = null;
-
     try {
-      if (typeof window === "undefined") {
-        throw new Error("not in a browser context");
-      }
-
-      popup = window.open("", "mouv_minute_google_oauth", GOOGLE_POPUP_FEATURES);
-      if (!popup) {
-        throw new Error("popup_blocked");
-      }
-
       const auth = await pb.collection("users").authWithOAuth2({
         provider: "google",
-        urlCallback: (url: string) => {
-          if (!popup || popup.closed) {
-            throw new Error("popup_blocked");
-          }
-          popup.location.href = url;
-          popup.focus();
-        },
       });
 
       setUser(toAppUser(auth.record));
@@ -245,10 +225,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       return { error: null };
     } catch (err: unknown) {
-      if (popup && !popup.closed) {
-        popup.close();
-      }
-
       toast({
         title: "Connexion Google impossible",
         description: getGoogleAuthErrorMessage(err),
