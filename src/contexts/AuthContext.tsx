@@ -186,28 +186,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signInWithGoogle = async () => {
     try {
-      const methods = await pb.collection("users").listAuthMethods();
-      const google = methods.oauth2?.providers?.find(
-        (p: { name: string }) => p.name === "google"
-      );
-      if (!google) throw new Error("Google provider non disponible");
-
-      const authUrl =
-        (google as { authUrl?: string }).authUrl ??
-        (google as { authURL?: string }).authURL;
-      if (!authUrl) throw new Error("Google authUrl manquant");
-
-      sessionStorage.setItem("pb_oauth2_state", google.state);
-      sessionStorage.setItem("pb_oauth2_verifier", google.codeVerifier);
-      sessionStorage.setItem("pb_oauth2_provider", "google");
-
-      window.location.href = authUrl;
-
+      const auth = await pb.collection("users").authWithOAuth2({
+        provider: "google",
+      });
+      setUser(toAppUser(auth.record));
+      toast({
+        title: "Connect\u00E9",
+        description: `Bon retour, ${toAppUser(auth.record).displayName} !`,
+      });
       return { error: null };
     } catch (err: unknown) {
+      const e = err as { isAbort?: boolean; message?: string };
+      const message = e?.isAbort
+        ? "Connexion Google annul\u00E9e."
+        : e?.message?.toLowerCase().includes("popup")
+          ? "Popup bloqu\u00E9e. Autorisez les popups puis r\u00E9essayez."
+          : "Connexion Google impossible. R\u00E9essayez.";
       toast({
         title: "Connexion Google impossible",
-        description: "Impossible de contacter Google.",
+        description: message,
         variant: "destructive",
       });
 

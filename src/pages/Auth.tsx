@@ -182,10 +182,7 @@ export default function Auth() {
 
     setGoogleSignInLoading(true);
     try {
-      const { error } = await signInWithGoogle();
-      if (!error) {
-        navigate("/");
-      }
+      await signInWithGoogle();
     } catch (error) {
       console.error("Google sign in error:", error);
     } finally {
@@ -417,7 +414,7 @@ export default function Auth() {
 
                 {showOtpFlow && (
                   <div className="space-y-4 rounded-lg border border-border/70 bg-background/60 p-4">
-                    <p className="text-sm font-medium">Recevoir un lien de connexion par email</p>
+                    <p className="text-sm font-medium">Connexion sans mot de passe</p>
 
                     {otpStep === "request" ? (
                       <form onSubmit={handleOtpRequest} className="space-y-3">
@@ -438,20 +435,26 @@ export default function Auth() {
                             />
                           </div>
                         </div>
+                        <p className="text-xs text-muted-foreground">
+                          {"Un code \u00E0 6 chiffres vous sera envoy\u00E9 par email. V\u00E9rifiez vos spams si vous ne le recevez pas."}
+                        </p>
 
                         <Button type="submit" className="w-full" disabled={otpRequestLoading}>
-                          {otpRequestLoading ? "Envoi..." : "Envoyer le code OTP"}
+                          {otpRequestLoading ? "Envoi..." : "Recevoir un code par email"}
                         </Button>
                       </form>
                     ) : (
                       <form onSubmit={handleOtpVerify} className="space-y-3">
                         <div className="space-y-2">
-                          <Label htmlFor="otp-code">Code OTP recu par email</Label>
+                          <Label htmlFor="otp-code">{"Code re\u00E7u par email (6 chiffres)"}</Label>
                           <Input
                             id="otp-code"
                             type="text"
                             autoComplete="one-time-code"
-                            placeholder="Entrez le code OTP"
+                            placeholder="123456"
+                            maxLength={6}
+                            inputMode="numeric"
+                            pattern="[0-9]*"
                             value={otpData.code}
                             onChange={(e) =>
                               setOtpData((prev) => ({
