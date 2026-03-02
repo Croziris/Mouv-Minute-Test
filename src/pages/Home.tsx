@@ -5,34 +5,105 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Layout } from "@/components/layout/Layout";
 import { Link } from "react-router-dom";
 import { ArticleCard } from "@/components/articles/ArticleCard";
-import { fetchNotionArticles, type NotionArticlePreview } from "@/lib/notionArticles";
+import {
+  clearNotionArticlesCache,
+  fetchNotionArticles,
+  type NotionArticlePreview,
+} from "@/lib/notionArticles";
 
 const HOME_ARTICLES_LIMIT = 4;
 
+interface InitialArticlesState {
+  articles: NotionArticlePreview[];
+  hasCachedData: boolean;
+}
+
+function isNotionArticlePreview(value: unknown): value is NotionArticlePreview {
+  if (!value || typeof value !== "object") return false;
+
+  const article = value as Record<string, unknown>;
+
+  return (
+    typeof article.id === "string" &&
+    typeof article.slug === "string" &&
+    typeof article.title === "string" &&
+    typeof article.summary === "string" &&
+    typeof article.imageUrl === "string" &&
+    Array.isArray(article.categories) &&
+    article.categories.every((category) => typeof category === "string") &&
+    (typeof article.publishedAt === "string" || article.publishedAt === null) &&
+    (typeof article.author === "string" || typeof article.author === "undefined")
+  );
+}
+
+function getInitialArticlesState(): InitialArticlesState {
+  if (typeof window === "undefined") {
+    return { articles: [], hasCachedData: false };
+  }
+
+  try {
+    const rawCache = window.localStorage.getItem("notion_articles_cache");
+    if (!rawCache) {
+      return { articles: [], hasCachedData: false };
+    }
+
+    const parsed = JSON.parse(rawCache) as unknown;
+    if (!parsed || typeof parsed !== "object") {
+      clearNotionArticlesCache();
+      return { articles: [], hasCachedData: false };
+    }
+
+    const cacheEntry = parsed as { data?: unknown };
+    if (!Array.isArray(cacheEntry.data)) {
+      clearNotionArticlesCache();
+      return { articles: [], hasCachedData: false };
+    }
+
+    const cachedArticles = cacheEntry.data.filter((item): item is NotionArticlePreview =>
+      isNotionArticlePreview(item)
+    );
+
+    return {
+      articles: cachedArticles,
+      hasCachedData: true,
+    };
+  } catch {
+    clearNotionArticlesCache();
+    return { articles: [], hasCachedData: false };
+  }
+}
+
 export default function Home() {
-  const [articles, setArticles] = useState<NotionArticlePreview[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialArticlesState] = useState<InitialArticlesState>(() => getInitialArticlesState());
+  const [articles, setArticles] = useState<NotionArticlePreview[]>(initialArticlesState.articles);
+  const [loading, setLoading] = useState(!initialArticlesState.hasCachedData);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
 
     const loadArticles = async () => {
-      setLoading(true);
-      setLoadError(null);
+      if (!initialArticlesState.hasCachedData) {
+        setLoading(true);
+      }
+
+      if (!initialArticlesState.hasCachedData) {
+        setLoadError(null);
+      }
 
       try {
         const publishedArticles = await fetchNotionArticles(HOME_ARTICLES_LIMIT);
         if (isMounted) {
           setArticles(publishedArticles);
+          setLoadError(null);
         }
       } catch (error) {
-        if (isMounted) {
+        if (isMounted && !initialArticlesState.hasCachedData) {
           console.error("Erreur chargement articles home:", error);
           setLoadError("Impossible de charger les articles pour le moment.");
         }
       } finally {
-        if (isMounted) {
+        if (isMounted && !initialArticlesState.hasCachedData) {
           setLoading(false);
         }
       }
@@ -43,7 +114,7 @@ export default function Home() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [initialArticlesState.hasCachedData]);
 
   return (
     <Layout>

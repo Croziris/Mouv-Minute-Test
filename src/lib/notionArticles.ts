@@ -48,9 +48,26 @@ interface ProxyEnvelope {
 }
 
 const notionProxyBaseUrl = (import.meta.env.VITE_NOTION_PROXY_BASE_URL || "").trim();
+const NOTION_ARTICLES_CACHE_KEY = "notion_articles_cache";
+const CACHE_TTL_MS = 30 * 60 * 1000;
+
+interface NotionArticlesCacheEntry {
+  data: NotionArticlePreview[];
+  timestamp: number;
+}
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+}
+
+function getSafeLocalStorage(): Storage | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
 }
 
 function defaultAnnotations(): NotionTextAnnotations {
@@ -197,6 +214,109 @@ function mapPageToPreview(page: Record<string, unknown>): NotionArticlePreview {
   };
 }
 
+function mapCachedPreview(value: unknown): NotionArticlePreview | null {
+  const article = asRecord(value);
+  if (!article) return null;
+
+  const categories = Array.isArray(article.categories)
+    ? article.categories.filter((item): item is string => typeof item === "string")
+    : [];
+
+  const author =
+    typeof article.author === "string" && article.author.trim().length > 0
+      ? article.author
+      : undefined;
+
+  return {
+    id: typeof article.id === "string" ? article.id : "",
+    slug: typeof article.slug === "string" ? article.slug : "",
+    title: typeof article.title === "string" ? article.title : "",
+    summary: typeof article.summary === "string" ? article.summary : "",
+    imageUrl: typeof article.imageUrl === "string" ? article.imageUrl : "",
+    categories,
+    publishedAt: typeof article.publishedAt === "string" ? article.publishedAt : null,
+    author,
+  };
+}
+
+function readCache(): NotionArticlesCacheEntry | null {
+  const storage = getSafeLocalStorage();
+  if (!storage) return null;
+
+  try {
+    const raw = storage.getItem(NOTION_ARTICLES_CACHE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as unknown;
+    const cachedObject = asRecord(parsed);
+    if (!cachedObject) return null;
+
+    const timestamp =
+      typeof cachedObject.timestamp === "number" && Number.isFinite(cachedObject.timestamp)
+        ? cachedObject.timestamp
+        : null;
+
+    if (timestamp === null || !Array.isArray(cachedObject.data)) return null;
+
+    const data = cachedObject.data
+      .map((item) => mapCachedPreview(item))
+      .filter((item): item is NotionArticlePreview => Boolean(item));
+
+    return { data, timestamp };
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(data: NotionArticlePreview[]): void {
+  const storage = getSafeLocalStorage();
+  if (!storage) return;
+
+  try {
+    const payload: NotionArticlesCacheEntry = {
+      data,
+      timestamp: Date.now(),
+    };
+    storage.setItem(NOTION_ARTICLES_CACHE_KEY, JSON.stringify(payload));
+  } catch {
+    // localStorage can be unavailable (private mode, quota exceeded, etc.)
+  }
+}
+
+function sortArticlesByPublishedDate(articles: NotionArticlePreview[]): void {
+  articles.sort((a, b) => {
+    const aTimestamp = a.publishedAt ? new Date(a.publishedAt).getTime() : Number.NEGATIVE_INFINITY;
+    const bTimestamp = b.publishedAt ? new Date(b.publishedAt).getTime() : Number.NEGATIVE_INFINITY;
+
+    const safeATimestamp = Number.isFinite(aTimestamp) ? aTimestamp : Number.NEGATIVE_INFINITY;
+    const safeBTimestamp = Number.isFinite(bTimestamp) ? bTimestamp : Number.NEGATIVE_INFINITY;
+
+    return safeBTimestamp - safeATimestamp;
+  });
+}
+
+function applyLimit(articles: NotionArticlePreview[], limit?: number): NotionArticlePreview[] {
+  const safeLimit = typeof limit === "number" && Number.isFinite(limit) ? Math.max(1, Math.floor(limit)) : null;
+  return safeLimit ? articles.slice(0, safeLimit) : articles;
+}
+
+async function fetchAndCacheAll(): Promise<NotionArticlePreview[]> {
+  const envelope = await fetchProxyEnvelope(new URLSearchParams({ type: "articles" }));
+  const rawResults = Array.isArray(envelope.results) ? envelope.results : [];
+
+  const articles = rawResults
+    .map((item) => {
+      const page = asRecord(item);
+      return page ? mapPageToPreview(page) : null;
+    })
+    .filter((article): article is NotionArticlePreview => Boolean(article));
+
+  sortArticlesByPublishedDate(articles);
+  writeCache(articles);
+
+  return articles;
+}
+
 function resolveFileLikeUrl(typeData: Record<string, unknown>): string | undefined {
   const fileData = asRecord(typeData.file);
   if (typeof fileData?.url === "string") return fileData.url;
@@ -286,28 +406,32 @@ function mapBlock(rawBlock: unknown): NotionBlock | null {
 }
 
 export async function fetchNotionArticles(limit?: number): Promise<NotionArticlePreview[]> {
-  const envelope = await fetchProxyEnvelope(new URLSearchParams({ type: "articles" }));
-  const rawResults = Array.isArray(envelope.results) ? envelope.results : [];
+  const cached = readCache();
 
-  const articles = rawResults
-    .map((item) => {
-      const page = asRecord(item);
-      return page ? mapPageToPreview(page) : null;
-    })
-    .filter((article): article is NotionArticlePreview => Boolean(article));
+  if (cached) {
+    const cacheAgeMs = Date.now() - cached.timestamp;
+    if (cacheAgeMs < CACHE_TTL_MS) {
+      return applyLimit(cached.data, limit);
+    }
 
-  articles.sort((a, b) => {
-    const aTimestamp = a.publishedAt ? new Date(a.publishedAt).getTime() : Number.NEGATIVE_INFINITY;
-    const bTimestamp = b.publishedAt ? new Date(b.publishedAt).getTime() : Number.NEGATIVE_INFINITY;
+    // stale-while-revalidate: return stale data immediately and refresh in background
+    void fetchAndCacheAll().catch(() => undefined);
+    return applyLimit(cached.data, limit);
+  }
 
-    const safeATimestamp = Number.isFinite(aTimestamp) ? aTimestamp : Number.NEGATIVE_INFINITY;
-    const safeBTimestamp = Number.isFinite(bTimestamp) ? bTimestamp : Number.NEGATIVE_INFINITY;
+  const freshArticles = await fetchAndCacheAll();
+  return applyLimit(freshArticles, limit);
+}
 
-    return safeBTimestamp - safeATimestamp;
-  });
+export function clearNotionArticlesCache(): void {
+  const storage = getSafeLocalStorage();
+  if (!storage) return;
 
-  const safeLimit = typeof limit === "number" && Number.isFinite(limit) ? Math.max(1, Math.floor(limit)) : null;
-  return safeLimit ? articles.slice(0, safeLimit) : articles;
+  try {
+    storage.removeItem(NOTION_ARTICLES_CACHE_KEY);
+  } catch {
+    // Ignore storage errors on cache clear.
+  }
 }
 
 export async function fetchNotionArticleById(articleId: string): Promise<NotionArticleDetail | null> {
