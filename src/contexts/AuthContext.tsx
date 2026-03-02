@@ -199,9 +199,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const e = err as { isAbort?: boolean; message?: string };
       const message = e?.isAbort
         ? "Connexion Google annul\u00E9e."
-        : e?.message?.toLowerCase().includes("popup")
-          ? "Popup bloqu\u00E9e. Autorisez les popups puis r\u00E9essayez."
-          : "Connexion Google impossible. R\u00E9essayez.";
+        : "Connexion Google impossible. R\u00E9essayez.";
       toast({
         title: "Connexion Google impossible",
         description: message,
