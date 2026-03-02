@@ -169,6 +169,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       return { error: null };
     } catch (err: unknown) {
+      console.error("SignIn error details:", err);
       toast({
         title: "Connexion impossible",
         description: "Email ou mot de passe invalide.",
@@ -191,11 +192,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       );
       if (!google) throw new Error("Google provider non disponible");
 
+      const authUrl =
+        (google as { authUrl?: string }).authUrl ??
+        (google as { authURL?: string }).authURL;
+      if (!authUrl) throw new Error("Google authUrl manquant");
+
       sessionStorage.setItem("pb_oauth2_state", google.state);
       sessionStorage.setItem("pb_oauth2_verifier", google.codeVerifier);
       sessionStorage.setItem("pb_oauth2_provider", "google");
 
-      window.location.href = google.authURL;
+      window.location.href = authUrl;
 
       return { error: null };
     } catch (err: unknown) {
