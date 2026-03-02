@@ -16,7 +16,6 @@ interface AuthContextType {
   signUp: (email: string, password: string, displayName?: string) => Promise<{ error: unknown | null }>;
   signIn: (email: string, password: string) => Promise<{ error: unknown | null }>;
   signInWithGoogle: () => Promise<{ error: unknown | null }>;
-  setUserFromRecord: (record: unknown) => void;
   requestOtp: (email: string) => Promise<{ error: unknown | null; otpId: string | null }>;
   signInWithOtp: (otpId: string, otpCode: string) => Promise<{ error: unknown | null }>;
   signOut: () => Promise<{ error: unknown | null }>;
@@ -180,10 +179,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const setUserFromRecord = (record: unknown) => {
-    setUser(toAppUser(record));
-  };
-
   const signInWithGoogle = async () => {
     try {
       const auth = await pb.collection("users").authWithOAuth2({
@@ -308,7 +303,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signUp,
     signIn,
     signInWithGoogle,
-    setUserFromRecord,
     requestOtp,
     signInWithOtp,
     signOut,
