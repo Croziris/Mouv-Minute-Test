@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Eye, EyeOff, User, Mail, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -95,6 +95,8 @@ export default function Auth() {
   const [otpRequestLoading, setOtpRequestLoading] = useState(false);
   const [otpVerifyLoading, setOtpVerifyLoading] = useState(false);
   const [otpData, setOtpData] = useState({ email: "", code: "" });
+  const [searchParams] = useSearchParams();
+  const oauthError = searchParams.get("error") === "oauth2";
 
   // Redirige si deja connecte
   useEffect(() => {
@@ -304,6 +306,13 @@ export default function Auth() {
               </TabsList>
 
               <TabsContent value="signin" className="space-y-4">
+                {oauthError && (
+                  <Alert variant="destructive">
+                    <AlertDescription>
+                      {"Connexion Google impossible. Reessayez ou utilisez email/mot de passe."}
+                    </AlertDescription>
+                  </Alert>
+                )}
                 <form onSubmit={handleSignIn} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="signin-email">Email</Label>

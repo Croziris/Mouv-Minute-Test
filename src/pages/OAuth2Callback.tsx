@@ -46,7 +46,8 @@ export default function OAuth2Callback() {
 
         setUserFromRecord(auth.record);
         navigate("/", { replace: true });
-      } catch (_error: unknown) {
+      } catch (error: unknown) {
+        console.error("OAuth2 callback error:", error);
         navigate("/auth?error=oauth2", { replace: true });
       } finally {
         clearOAuth2SessionStorage();

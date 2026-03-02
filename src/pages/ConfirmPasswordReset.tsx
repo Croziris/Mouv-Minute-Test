@@ -9,26 +9,17 @@ import { pb } from "@/lib/pocketbase";
 
 type ConfirmResetState = "idle" | "loading" | "success" | "error";
 
-const isExpiredResetTokenError = (error: unknown): boolean => {
-  const message =
-    typeof error === "object" && error !== null
-      ? [
-          "message" in error ? (error as { message?: unknown }).message : null,
-          "response" in error &&
-          typeof (error as { response?: unknown }).response === "object" &&
-          (error as { response?: { message?: unknown } }).response !== null
-            ? (error as { response?: { message?: unknown } }).response?.message
-            : null,
-        ]
-          .filter((part): part is string => typeof part === "string")
-          .join(" ")
-          .toLowerCase()
-      : "";
+const getErrorStatus = (error: unknown): number | null => {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "status" in error &&
+    typeof (error as { status?: unknown }).status === "number"
+  ) {
+    return (error as { status: number }).status;
+  }
 
-  const hasTokenKeyword = message.includes("token");
-  const hasExpiredKeyword = message.includes("expired") || message.includes("invalid");
-
-  return hasTokenKeyword && hasExpiredKeyword;
+  return null;
 };
 
 export default function ConfirmPasswordReset() {
@@ -96,10 +87,10 @@ export default function ConfirmPasswordReset() {
     } catch (error: unknown) {
       setState("error");
 
-      if (isExpiredResetTokenError(error)) {
+      if (getErrorStatus(error) === 400) {
         setIsExpiredToken(true);
         setErrorMessage(
-          "Ce lien a expir\u00E9. Demandez un nouveau lien depuis la page de connexion."
+          "Lien expir\u00E9 ou invalide, demandez un nouveau lien de r\u00E9initialisation"
         );
         return;
       }
