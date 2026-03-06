@@ -162,7 +162,7 @@ export default function Session() {
                   <div>
                     <CardTitle className="text-xl font-heading">{currentExData.title}</CardTitle>
                     <CardDescription>
-                      Zone : {currentExData.zone} • {currentExData.duration_sec}s
+                      Zone : {(Array.isArray(currentExData.zones) ? currentExData.zones.join(", ") : "Autre")} • {currentExData.duration_sec}s
                     </CardDescription>
                   </div>
                   {isCurrentCompleted && <CheckCircle className="h-6 w-6 text-primary" />}
@@ -302,7 +302,7 @@ export default function Session() {
                         <div>
                           <p className="font-medium text-sm">{exData?.title || "Exercice"}</p>
                           <p className="text-xs text-muted-foreground">
-                            {exData?.zone} • {exData?.duration_sec}s
+                            {(Array.isArray(exData?.zones) ? exData?.zones.join(", ") : "Autre")} • {exData?.duration_sec}s
                           </p>
                         </div>
                       </div>

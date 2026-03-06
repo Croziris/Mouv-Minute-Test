@@ -66,7 +66,8 @@ export default function ExerciseDetail() {
     );
   }
 
-  const config = zoneConfig[exercise.zone as keyof typeof zoneConfig];
+  const primaryZone = Array.isArray(exercise.zones) ? exercise.zones[0] : undefined;
+  const config = primaryZone ? zoneConfig[primaryZone as keyof typeof zoneConfig] : undefined;
 
   const youtubeEmbed = buildYouTubeEmbedUrl(exercise.youtube_id);
 

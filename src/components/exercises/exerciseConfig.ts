@@ -1,13 +1,10 @@
-import { Exercise } from "@/lib/pocketbase";
-
-export type ExerciseZone = Exercise["zone"];
+export type ExerciseZone = "Nuque" | "Bas_du_dos" | "Haut_du_dos" | "Jambes" | "Bras" | "Autre";
 
 export const zoneConfig: Record<ExerciseZone, { label: string; color: string }> = {
-  nuque: { label: "Nuque", color: "bg-primary/10 text-primary" },
-  epaules: { label: "Epaules", color: "bg-accent/10 text-accent" },
-  dos: { label: "Dos", color: "bg-primary/15 text-primary" },
-  trapezes: { label: "Trapezes", color: "bg-accent/15 text-accent" },
-  tronc: { label: "Tronc", color: "bg-primary/20 text-primary" },
-  jambes: { label: "Jambes", color: "bg-accent/20 text-accent" },
-  general: { label: "General", color: "bg-secondary text-secondary-foreground" },
+  Nuque: { label: "Nuque", color: "bg-primary/10 text-primary" },
+  Bas_du_dos: { label: "Bas du dos", color: "bg-accent/10 text-accent" },
+  Haut_du_dos: { label: "Haut du dos", color: "bg-primary/15 text-primary" },
+  Jambes: { label: "Jambes", color: "bg-accent/15 text-accent" },
+  Bras: { label: "Bras", color: "bg-primary/20 text-primary" },
+  Autre: { label: "Autre", color: "bg-secondary text-secondary-foreground" },
 };

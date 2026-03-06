@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,7 +22,7 @@ type AdminTab = "list" | "form";
 
 interface ExerciseFormState {
   title: string;
-  zone: ExerciseZone;
+  zone: ExerciseZone[];
   duration_sec: string;
   youtube_id: string;
   thumb_url: string;
@@ -29,15 +30,15 @@ interface ExerciseFormState {
   notes_kine: string;
 }
 
-const emptyForm: ExerciseFormState = {
+const createEmptyForm = (): ExerciseFormState => ({
   title: "",
-  zone: "nuque",
+  zone: ["Autre"],
   duration_sec: "45",
   youtube_id: "",
   thumb_url: "",
   description_public: "",
   notes_kine: "",
-};
+});
 
 interface ExerciseAdminPanelProps {
   open: boolean;
@@ -58,10 +59,11 @@ export function ExerciseAdminPanel({
   const [editingExerciseId, setEditingExerciseId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [form, setForm] = useState<ExerciseFormState>(emptyForm);
+  const [form, setForm] = useState<ExerciseFormState>(createEmptyForm);
 
   const zones = Object.keys(zoneConfig) as ExerciseZone[];
   const isAbortError = (error: unknown) => Boolean((error as { isAbort?: boolean })?.isAbort);
+  const isExerciseZone = (value: string): value is ExerciseZone => value in zoneConfig;
 
   const refreshParent = useCallback(async () => {
     await Promise.resolve(onExercisesChanged());
@@ -98,15 +100,16 @@ export function ExerciseAdminPanel({
 
   const openCreateForm = () => {
     setEditingExerciseId(null);
-    setForm(emptyForm);
+    setForm(createEmptyForm());
     setAdminTab("form");
   };
 
   const openEditForm = (exercise: Exercise) => {
+    const existingZones = Array.isArray(exercise.zones) ? exercise.zones.filter(isExerciseZone) : [];
     setEditingExerciseId(exercise.id);
     setForm({
       title: exercise.title || "",
-      zone: exercise.zone,
+      zone: existingZones.length > 0 ? existingZones : ["Autre"],
       duration_sec: String(exercise.duration_sec || 45),
       youtube_id: buildYouTubeWatchUrl(exercise.youtube_id) || exercise.youtube_id || "",
       thumb_url: exercise.thumb_url || "",
@@ -124,6 +127,15 @@ export function ExerciseAdminPanel({
       toast({
         title: "Champ requis",
         description: "Le titre est obligatoire.",
+        variant: "destructive",
+      });
+      return null;
+    }
+
+    if (form.zone.length === 0) {
+      toast({
+        title: "Champ requis",
+        description: "Sélectionnez au moins une zone",
         variant: "destructive",
       });
       return null;
@@ -149,7 +161,7 @@ export function ExerciseAdminPanel({
 
     return {
       title: form.title.trim(),
-      zone: form.zone,
+      zones: form.zone,
       duration_sec: Math.round(durationSec),
       youtube_id: youtubeId,
       thumb_url: form.thumb_url.trim(),
@@ -180,7 +192,7 @@ export function ExerciseAdminPanel({
       }
 
       setEditingExerciseId(null);
-      setForm(emptyForm);
+      setForm(createEmptyForm());
       setAdminTab("list");
       await Promise.all([loadAdminExercises(), refreshParent()]);
     } catch (error) {
@@ -210,7 +222,7 @@ export function ExerciseAdminPanel({
 
       if (editingExerciseId === exercise.id) {
         setEditingExerciseId(null);
-        setForm(emptyForm);
+        setForm(createEmptyForm());
         setAdminTab("list");
       }
 
@@ -244,7 +256,7 @@ export function ExerciseAdminPanel({
           <Button
             variant={adminTab === "form" ? "default" : "outline"}
             onClick={() => {
-              if (!editingExerciseId) setForm(emptyForm);
+              if (!editingExerciseId) setForm(createEmptyForm());
               setAdminTab("form");
             }}
           >
@@ -273,44 +285,51 @@ export function ExerciseAdminPanel({
                   </CardContent>
                 </Card>
               ) : (
-                adminExercises.map((exercise) => (
-                  <Card key={exercise.id}>
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="space-y-1">
-                          <p className="font-medium">{exercise.title}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Zone: {exercise.zone} - Duree: {exercise.duration_sec}s
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Lien YouTube: {buildYouTubeWatchUrl(exercise.youtube_id) || "non renseigne"}
-                          </p>
+                adminExercises.map((exercise) => {
+                  const displayZones = Array.isArray(exercise.zones)
+                    ? exercise.zones.map((zone) => (isExerciseZone(zone) ? zoneConfig[zone].label : zone))
+                    : [];
+
+                  return (
+                    <Card key={exercise.id}>
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="space-y-1">
+                            <p className="font-medium">{exercise.title}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Zone{displayZones.length > 1 ? "s" : ""}: {displayZones.join(", ") || "Non renseignee"} -
+                              Duree: {exercise.duration_sec}s
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Lien YouTube: {buildYouTubeWatchUrl(exercise.youtube_id) || "non renseigne"}
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={() => openEditForm(exercise)}>
+                              <Pencil className="h-4 w-4 mr-1" />
+                              Editer
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => void deleteExercise(exercise)}
+                              disabled={deletingId === exercise.id}
+                            >
+                              {deletingId === exercise.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <>
+                                  <Trash2 className="h-4 w-4 mr-1" />
+                                  Supprimer
+                                </>
+                              )}
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm" onClick={() => openEditForm(exercise)}>
-                            <Pencil className="h-4 w-4 mr-1" />
-                            Editer
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => void deleteExercise(exercise)}
-                            disabled={deletingId === exercise.id}
-                          >
-                            {deletingId === exercise.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <>
-                                <Trash2 className="h-4 w-4 mr-1" />
-                                Supprimer
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
+                      </CardContent>
+                    </Card>
+                  );
+                })
               )}
             </div>
           </div>
@@ -327,22 +346,36 @@ export function ExerciseAdminPanel({
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="admin-zone">Zone</Label>
-                <select
-                  id="admin-zone"
-                  value={form.zone}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, zone: event.target.value as ExerciseZone }))
-                  }
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                >
-                  {zones.map((zone) => (
-                    <option key={zone} value={zone}>
-                      {zoneConfig[zone].label}
-                    </option>
-                  ))}
-                </select>
+              <div className="space-y-2 md:col-span-2">
+                <Label>Zones</Label>
+                <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
+                  {zones.map((zone) => {
+                    const id = `admin-zone-${zone}`;
+                    return (
+                      <label
+                        key={zone}
+                        htmlFor={id}
+                        className="flex items-center gap-2 rounded-md border border-input px-3 py-2 text-sm"
+                      >
+                        <Checkbox
+                          id={id}
+                          checked={form.zone.includes(zone)}
+                          onCheckedChange={(checked) => {
+                            const isChecked = checked === true;
+                            setForm((prev) => {
+                              if (isChecked) {
+                                if (prev.zone.includes(zone)) return prev;
+                                return { ...prev, zone: [...prev.zone, zone] };
+                              }
+                              return { ...prev, zone: prev.zone.filter((z) => z !== zone) };
+                            });
+                          }}
+                        />
+                        <span>{zoneConfig[zone].label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -405,7 +438,7 @@ export function ExerciseAdminPanel({
                 variant="outline"
                 onClick={() => {
                   setEditingExerciseId(null);
-                  setForm(emptyForm);
+                  setForm(createEmptyForm());
                   setAdminTab("list");
                 }}
               >

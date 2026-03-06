@@ -11,7 +11,7 @@ pb.autoCancellation(false)
 export interface Exercise {
   id: string
   title: string
-  zone: 'nuque' | 'epaules' | 'dos' | 'trapezes' | 'tronc' | 'jambes' | 'general'
+  zones: string[]
   duration_sec: number
   youtube_id: string
   thumb_url: string
@@ -21,7 +21,7 @@ export interface Exercise {
 
 export interface ExercisePayload {
   title: string
-  zone: Exercise['zone']
+  zones: string[]
   duration_sec: number
   youtube_id: string
   thumb_url: string
@@ -129,7 +129,7 @@ export const exerciseService = {
 
   // Récupérer tous les exercices
   async getAll(zone?: string) {
-    const filter = zone ? `zone = "${zone}"` : ''
+    const filter = zone ? `zones?~"${zone}"` : ''
     return await pb.collection('exercises').getFullList<Exercise>({
       filter,
       sort: 'title',

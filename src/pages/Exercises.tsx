@@ -52,8 +52,11 @@ export default function Exercises() {
   }, [loadExercises]);
 
   const groupedExercises = exercises.reduce((acc, exercise) => {
-    if (!acc[exercise.zone]) acc[exercise.zone] = [];
-    acc[exercise.zone].push(exercise);
+    const zoneList = Array.isArray(exercise.zones) ? exercise.zones : [];
+    for (const z of zoneList) {
+      if (!acc[z]) acc[z] = [];
+      acc[z].push(exercise);
+    }
     return acc;
   }, {} as Record<string, Exercise[]>);
 
