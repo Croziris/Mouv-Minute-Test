@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Bell,
   BellOff,
@@ -122,6 +123,7 @@ const toExerciseStepItem = (exercise: Exercise): StepItem => ({
 });
 
 export default function Session() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
 
@@ -140,10 +142,6 @@ export default function Session() {
 
   const [plans, setPlans] = useState<WorkoutPlan[]>([]);
   const [isLoadingPlans, setIsLoadingPlans] = useState(true);
-  const [openPlanId, setOpenPlanId] = useState<string | null>(null);
-  const [currentStep, setCurrentStep] = useState(0);
-  const [planExercisesById, setPlanExercisesById] = useState<Record<string, WorkoutPlanExercise[]>>({});
-  const [planExercisesLoadingById, setPlanExercisesLoadingById] = useState<Record<string, boolean>>({});
 
   const [breakExercises, setBreakExercises] = useState<Exercise[]>([]);
   const [isLoadingBreakExercises, setIsLoadingBreakExercises] = useState(false);
@@ -184,11 +182,6 @@ export default function Session() {
         if (!prev || !sorted.some((plan) => plan.id === prev)) return sorted[0].id;
         return prev;
       });
-
-      setOpenPlanId((prev) => {
-        if (!prev) return prev;
-        return sorted.some((plan) => plan.id === prev) ? prev : null;
-      });
     } catch (error) {
       console.error("Error loading workout plans:", error);
       toast({
@@ -198,24 +191,6 @@ export default function Session() {
       });
     } finally {
       setIsLoadingPlans(false);
-    }
-  }, []);
-
-  const loadPlanExercisesForUser = useCallback(async (planId: string) => {
-    try {
-      setPlanExercisesLoadingById((prev) => ({ ...prev, [planId]: true }));
-      const data = await workoutPlanService.getExercises(planId);
-      const sorted = sortPlanExercises(data);
-      setPlanExercisesById((prev) => ({ ...prev, [planId]: sorted }));
-    } catch (error) {
-      console.error("Error loading plan exercises:", error);
-      toast({
-        title: "Erreur",
-        description: "Impossible de charger les exercices de la seance.",
-        variant: "destructive",
-      });
-    } finally {
-      setPlanExercisesLoadingById((prev) => ({ ...prev, [planId]: false }));
     }
   }, []);
 
@@ -230,7 +205,6 @@ export default function Session() {
       const data = await workoutPlanService.getExercises(planId);
       const sorted = sortPlanExercises(data);
       setAdminPlanExercises(sorted);
-      setPlanExercisesById((prev) => ({ ...prev, [planId]: sorted }));
 
       const nextOrder = sorted.reduce((max, entry) => Math.max(max, entry.order_index), -1) + 1;
       setNewExerciseOrderIndex(String(nextOrder));
@@ -351,7 +325,7 @@ export default function Session() {
       setTimerState("break");
 
       if (notificationsEnabled && notificationPermission === "granted") {
-        showLocalNotification("Mouv'Minute 🧘", {
+        showLocalNotification("Mouv'Minute (pause active)", {
           body: "C'est l'heure de bouger !",
           tag: "break-reminder",
           requireInteraction: true,
@@ -422,7 +396,7 @@ export default function Session() {
         await sessionService.end(sessionId);
       }
       toast({
-        title: "Séance validée 🎉",
+        title: "Séance validée",
         description: "Bravo, votre session est terminee.",
       });
       resetTimer();
@@ -439,13 +413,6 @@ export default function Session() {
   useEffect(() => {
     void loadPlans();
   }, [loadPlans]);
-
-  useEffect(() => {
-    setCurrentStep(0);
-    if (openPlanId) {
-      void loadPlanExercisesForUser(openPlanId);
-    }
-  }, [openPlanId, loadPlanExercisesForUser]);
 
   useEffect(() => {
     if (!adminOpen || !isAdmin) return;
@@ -490,19 +457,6 @@ export default function Session() {
     }
   }, [duration, timerState]);
 
-  const openPlanExercises = openPlanId ? planExercisesById[openPlanId] ?? [] : [];
-  const isLoadingOpenPlanExercises = openPlanId ? Boolean(planExercisesLoadingById[openPlanId]) : false;
-
-  useEffect(() => {
-    if (openPlanExercises.length === 0) {
-      setCurrentStep(0);
-      return;
-    }
-    if (currentStep > openPlanExercises.length - 1) {
-      setCurrentStep(0);
-    }
-  }, [currentStep, openPlanExercises]);
-
   const availableExercisesForSelectedPlan = useMemo(() => {
     const existingExerciseIds = new Set(adminPlanExercises.map((entry) => entry.exercise));
     return allExercises.filter((exercise) => !existingExerciseIds.has(exercise.id));
@@ -538,10 +492,6 @@ export default function Session() {
       setCurrentBreakStep(stepsCount);
     }
   }, [breakExercises.length, breakPlanExercises.length, currentBreakStep, hasBreakPlan]);
-
-  const togglePlan = (planId: string) => {
-    setOpenPlanId((prev) => (prev === planId ? null : planId));
-  };
 
   const startCreatePlan = () => {
     const maxOrder = plans.reduce((max, plan) => Math.max(max, plan.order_index), -1);
@@ -613,8 +563,6 @@ export default function Session() {
       setDeletingPlanId(plan.id);
       await workoutPlanService.remove(plan.id);
       toast({ title: "Seance supprimee", description: "La seance a ete retiree." });
-
-      if (openPlanId === plan.id) setOpenPlanId(null);
       if (selectedAdminPlanId === plan.id) setAdminPlanExercises([]);
       if (editingPlanId === plan.id) cancelPlanEdition();
 
@@ -636,9 +584,6 @@ export default function Session() {
       setIsSavingPlanExercise(true);
       await workoutPlanService.reorderExercise(entry.id, newOrderIndex);
       await loadAdminPlanExercises(selectedAdminPlanId);
-      if (openPlanId === selectedAdminPlanId) {
-        await loadPlanExercisesForUser(selectedAdminPlanId);
-      }
     } catch (error) {
       console.error("Error reordering plan exercise:", error);
       toast({ title: "Erreur", description: "Impossible de reordonner l'exercice.", variant: "destructive" });
@@ -654,9 +599,6 @@ export default function Session() {
       setIsSavingPlanExercise(true);
       await workoutPlanService.removeExercise(entryId);
       await loadAdminPlanExercises(selectedAdminPlanId);
-      if (openPlanId === selectedAdminPlanId) {
-        await loadPlanExercisesForUser(selectedAdminPlanId);
-      }
     } catch (error) {
       console.error("Error removing plan exercise:", error);
       toast({ title: "Erreur", description: "Impossible de retirer l'exercice.", variant: "destructive" });
@@ -668,7 +610,7 @@ export default function Session() {
   const addExerciseToPlan = async () => {
     if (!selectedAdminPlanId) {
       toast({
-        title: "Seance requise",
+        title: "Séance requise",
         description: "Choisissez une seance avant d'ajouter un exercice.",
         variant: "destructive",
       });
@@ -698,9 +640,6 @@ export default function Session() {
       setIsSavingPlanExercise(true);
       await workoutPlanService.addExercise(selectedAdminPlanId, selectedExerciseIdToAdd, Math.floor(orderIndex));
       await loadAdminPlanExercises(selectedAdminPlanId);
-      if (openPlanId === selectedAdminPlanId) {
-        await loadPlanExercisesForUser(selectedAdminPlanId);
-      }
 
       toast({ title: "Exercice ajoute", description: "L'exercice a ete ajoute a la seance." });
     } catch (error) {
@@ -757,8 +696,6 @@ export default function Session() {
     </div>
   );
 
-  const openPlan = useMemo(() => plans.find((plan) => plan.id === openPlanId) ?? null, [openPlanId, plans]);
-  const openPlanStepItems = useMemo(() => openPlanExercises.map(toPlanStepItem), [openPlanExercises]);
   const breakPlanStepItems = useMemo(() => breakPlanExercises.map(toPlanStepItem), [breakPlanExercises]);
   const breakExerciseStepItems = useMemo(() => breakExercises.map(toExerciseStepItem), [breakExercises]);
 
@@ -804,7 +741,7 @@ export default function Session() {
               <CardTitle className="text-base">{item.title}</CardTitle>
               <CardDescription>
                 Etape {index + 1}/{items.length}
-                {item.durationSec > 0 ? ` • ${formatDuration(item.durationSec)}` : ""}
+                {item.durationSec > 0 ? ` - ${formatDuration(item.durationSec)}` : ""}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -817,10 +754,10 @@ export default function Session() {
               <p className="text-sm text-muted-foreground">{item.description}</p>
 
               {!isLastStep ? (
-                <Button onClick={onNext}>Exercice suivant →</Button>
+                <Button onClick={onNext}>Exercice suivant -&gt;</Button>
               ) : (
                 <Button className="bg-primary hover:bg-primary-dark text-primary-foreground" onClick={onFinish}>
-                  Terminer la séance ✓
+                  Terminer la seance
                 </Button>
               )}
             </CardContent>
@@ -952,9 +889,8 @@ export default function Session() {
                   <div className="flex items-center gap-3">
                     <Clock className="h-5 w-5 text-primary" />
                     <div>
-                      <p className="text-sm font-medium">
-                        Durée recommandée — 30 à 45 min de travail, puis 5 min d'exercices
-                      </p>
+                      <p className="text-sm font-medium">Durée recommandée</p>
+                      <p className="text-xs text-muted-foreground">30 à 45 min de travail, puis 5 min d'exercices.</p>
                     </div>
                   </div>
                 </CardContent>
@@ -972,9 +908,7 @@ export default function Session() {
                         )}
                         <div>
                           <p className="text-sm font-medium">Notifications de rappel</p>
-                          <p className="text-xs text-muted-foreground">
-                            Recevoir une alerte quand le timer arrive à zéro.
-                          </p>
+                          <p className="text-xs text-muted-foreground">Recevoir une alerte quand le timer arrive à zéro.</p>
                         </div>
                       </div>
                       <Switch checked={notificationsEnabled} onCheckedChange={handleNotificationToggle} />
@@ -1021,72 +955,27 @@ export default function Session() {
                 ) : (
                   <>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                      {plans.map((plan) => {
-                        const isOpen = openPlanId === plan.id;
-                        return (
-                          <Card
-                            key={plan.id}
-                            className={`cursor-pointer border-border/70 transition-all duration-300 hover:border-primary/40 ${
-                              isOpen ? "border-primary/50" : ""
-                            }`}
-                            onClick={() => togglePlan(plan.id)}
-                          >
-                            <CardContent className="p-4">
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="space-y-1">
-                                  <p className="font-medium text-primary">{plan.title}</p>
-                                  <p className="text-sm text-muted-foreground">{plan.description || "Aucune description."}</p>
-                                  <p className="text-xs text-muted-foreground">3–5 exercices • ~5 min</p>
-                                </div>
-                                {isOpen ? (
-                                  <ChevronUp className="h-5 w-5 text-muted-foreground" />
-                                ) : (
-                                  <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                                )}
+                      {plans.map((plan) => (
+                        <Card
+                          key={plan.id}
+                          className="cursor-pointer border-border/70 transition-all duration-300 hover:border-primary/40"
+                          onClick={() => navigate(`/session/plans/${plan.id}`, { state: { plan } })}
+                        >
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="space-y-1">
+                                <p className="font-medium text-primary">{plan.title}</p>
+                                <p className="text-sm text-muted-foreground">{plan.description || "Aucune description."}</p>
+                                <p className="text-xs text-muted-foreground">3-5 exercices - ~5 min</p>
                               </div>
-                            </CardContent>
-                          </Card>
-                        );
-                      })}
+                              <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
                     </div>
 
-                    {openPlanId ? (
-                      <div className="space-y-3 rounded-lg border border-border/70 p-4">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="font-medium">{openPlan?.title || "Séance sélectionnée"}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {openPlan?.description || "Suivez les étapes dans l'ordre."}
-                            </p>
-                          </div>
-                          <Button variant="outline" size="sm" onClick={() => setOpenPlanId(null)}>
-                            Fermer
-                          </Button>
-                        </div>
-
-                        {isLoadingOpenPlanExercises ? (
-                          <div className="flex justify-center py-6">
-                            <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                          </div>
-                        ) : openPlanStepItems.length === 0 ? (
-                          <Card className="border-dashed">
-                            <CardContent className="p-4 text-sm text-muted-foreground">
-                              Aucun exercice dans cette séance.
-                            </CardContent>
-                          </Card>
-                        ) : (
-                          renderStepCards(
-                            openPlanStepItems,
-                            currentStep,
-                            () => setCurrentStep((prev) => Math.min(prev + 1, openPlanStepItems.length - 1)),
-                            () => {
-                              setCurrentStep(0);
-                              setOpenPlanId(null);
-                            },
-                          )
-                        )}
-                      </div>
-                    ) : null}
+                    
                   </>
                 )}
               </CardContent>
@@ -1277,13 +1166,14 @@ export default function Session() {
       </div>
 
       <Dialog open={adminOpen} onOpenChange={setAdminOpen}>
-        <DialogContent className="max-w-5xl">
+        <DialogContent className="max-w-3xl w-full">
           <DialogHeader>
             <DialogTitle>Gestion des seances</DialogTitle>
             <DialogDescription>Creer, modifier et organiser les seances et leurs exercices.</DialogDescription>
           </DialogHeader>
 
-          <Tabs value={adminTab} onValueChange={(value) => isAdminTab(value) && setAdminTab(value)} className="space-y-4">
+          <div className="max-h-[80vh] overflow-y-auto pr-1">
+            <Tabs value={adminTab} onValueChange={(value) => isAdminTab(value) && setAdminTab(value)} className="space-y-4">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="plans">Seances</TabsTrigger>
               <TabsTrigger value="plan-exercises">Exercices de la seance</TabsTrigger>
@@ -1370,7 +1260,7 @@ export default function Session() {
                     <CardHeader>
                       <CardTitle className="text-base">Exercices actuels</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-2">
+                    <CardContent>
                       {isLoadingAdminExercises ? (
                         <div className="flex justify-center py-6">
                           <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -1378,43 +1268,45 @@ export default function Session() {
                       ) : adminPlanExercises.length === 0 ? (
                         <p className="text-sm text-muted-foreground">Aucun exercice dans cette seance.</p>
                       ) : (
-                        adminPlanExercises.map((entry, index) => (
-                          <div
-                            key={entry.id}
-                            className="flex items-center justify-between rounded-md border border-border/70 p-3"
-                          >
-                            <p className="text-sm">
-                              <span className="font-medium">{entry.order_index}</span> -{" "}
-                              {entry.expand?.exercise?.title || "Exercice indisponible"}
-                            </p>
-                            <div className="flex items-center gap-1">
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                onClick={() => void reorderPlanExercise(entry, "up")}
-                                disabled={entry.order_index === 0 || isSavingPlanExercise}
-                              >
-                                <ChevronUp className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                onClick={() => void reorderPlanExercise(entry, "down")}
-                                disabled={index === adminPlanExercises.length - 1 || isSavingPlanExercise}
-                              >
-                                <ChevronDown className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => void removePlanExercise(entry.id)}
-                                disabled={isSavingPlanExercise}
-                              >
-                                Retirer
-                              </Button>
+                        <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
+                          {adminPlanExercises.map((entry, index) => (
+                            <div
+                              key={entry.id}
+                              className="flex items-center justify-between rounded-md border border-border/70 p-3"
+                            >
+                              <p className="text-sm">
+                                <span className="font-medium">{entry.order_index}</span> -{" "}
+                                {entry.expand?.exercise?.title || "Exercice indisponible"}
+                              </p>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => void reorderPlanExercise(entry, "up")}
+                                  disabled={entry.order_index === 0 || isSavingPlanExercise}
+                                >
+                                  <ChevronUp className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => void reorderPlanExercise(entry, "down")}
+                                  disabled={index === adminPlanExercises.length - 1 || isSavingPlanExercise}
+                                >
+                                  <ChevronDown className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => void removePlanExercise(entry.id)}
+                                  disabled={isSavingPlanExercise}
+                                >
+                                  Retirer
+                                </Button>
+                              </div>
                             </div>
-                          </div>
-                        ))
+                          ))}
+                        </div>
                       )}
                     </CardContent>
                   </Card>
@@ -1481,6 +1373,7 @@ export default function Session() {
               )}
             </TabsContent>
           </Tabs>
+          </div>
         </DialogContent>
       </Dialog>
     </Layout>

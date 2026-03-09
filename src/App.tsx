@@ -16,6 +16,7 @@ import ConfirmPasswordReset from "./pages/ConfirmPasswordReset";
 import NotFound from "./pages/NotFound";
 import ArchivesConseils from "./pages/ArchivesConseils";
 import Session from "./pages/Session";
+import WorkoutPlanDetail from "./pages/WorkoutPlanDetail";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +30,7 @@ const App = () => {
               <Route path="/" element={<Home />} />
               <Route path="/timer" element={<Timer />} />
               <Route path="/session" element={<Session />} />
+              <Route path="/session/plans/:planId" element={<WorkoutPlanDetail />} />
               <Route path="/exercises" element={<Exercises />} />
               <Route path="/exercises/:id" element={<ExerciseDetail />} />
               <Route path="/article/:id" element={<ArticleDetail />} />
