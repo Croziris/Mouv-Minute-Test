@@ -46,6 +46,21 @@ export interface ProgramExercise {
   expand?: { exercise: Exercise }
 }
 
+export interface WorkoutPlan {
+  id: string
+  title: string
+  description: string
+  order_index: number
+}
+
+export interface WorkoutPlanExercise {
+  id: string
+  plan: string
+  exercise: string
+  order_index: number
+  expand?: { exercise: Exercise }
+}
+
 export interface Session {
   id: string
   user: string
@@ -180,6 +195,71 @@ export const programService = {
       sort: 'order_index',
       expand: 'exercise',
     })
+  },
+}
+
+// ============================================================
+// PLANS D'EXERCICES
+// ============================================================
+
+export const workoutPlanService = {
+
+  // Recuperer tous les plans
+  async getAll() {
+    return await pb.collection('workout_plans').getFullList<WorkoutPlan>({
+      sort: 'order_index',
+    })
+  },
+
+  // Recuperer un plan par ID
+  async getById(id: string) {
+    return await pb.collection('workout_plans').getOne<WorkoutPlan>(id)
+  },
+
+  // Creer un plan
+  async create(payload: { title: string; description: string; order_index: number }) {
+    return await pb.collection('workout_plans').create<WorkoutPlan>(payload)
+  },
+
+  // Mettre a jour un plan
+  async update(id: string, payload: { title?: string; description?: string; order_index?: number }) {
+    return await pb.collection('workout_plans').update<WorkoutPlan>(id, payload)
+  },
+
+  // Supprimer un plan
+  async remove(id: string) {
+    return await pb.collection('workout_plans').delete(id)
+  },
+
+  // Recuperer les exercices d'un plan
+  async getExercises(planId: string) {
+    return await pb.collection('workout_plan_exercises').getFullList<WorkoutPlanExercise>({
+      filter: `plan = "${planId}"`,
+      sort: 'order_index',
+      expand: 'exercise',
+    })
+  },
+
+  // Ajouter un exercice au plan
+  async addExercise(planId: string, exerciseId: string, orderIndex: number) {
+    return await pb.collection('workout_plan_exercises').create<WorkoutPlanExercise>({
+      plan: planId,
+      exercise: exerciseId,
+      order_index: orderIndex,
+    })
+  },
+
+  // Supprimer un exercice du plan
+  async removeExercise(workoutPlanExerciseId: string) {
+    return await pb.collection('workout_plan_exercises').delete(workoutPlanExerciseId)
+  },
+
+  // Reordonner un exercice dans le plan
+  async reorderExercise(workoutPlanExerciseId: string, newOrderIndex: number) {
+    return await pb.collection('workout_plan_exercises').update<WorkoutPlanExercise>(
+      workoutPlanExerciseId,
+      { order_index: newOrderIndex }
+    )
   },
 }
 
