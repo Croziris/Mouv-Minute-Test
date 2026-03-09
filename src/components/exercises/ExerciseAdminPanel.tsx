@@ -15,7 +15,13 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import { exerciseService, Exercise, ExercisePayload } from "@/lib/pocketbase";
-import { ExerciseZone, zoneConfig } from "@/components/exercises/exerciseConfig";
+import {
+  ExerciseZone,
+  exerciseZones,
+  getExerciseZoneFromPocketBaseValue,
+  isExerciseZone,
+  zoneConfig,
+} from "@/components/exercises/exerciseConfig";
 import { buildYouTubeWatchUrl, extractYouTubeId } from "@/lib/youtube";
 
 type AdminTab = "list" | "form";
@@ -61,9 +67,8 @@ export function ExerciseAdminPanel({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [form, setForm] = useState<ExerciseFormState>(createEmptyForm);
 
-  const zones = Object.keys(zoneConfig) as ExerciseZone[];
+  const zones = exerciseZones;
   const isAbortError = (error: unknown) => Boolean((error as { isAbort?: boolean })?.isAbort);
-  const isExerciseZone = (value: string): value is ExerciseZone => value in zoneConfig;
 
   const refreshParent = useCallback(async () => {
     await Promise.resolve(onExercisesChanged());
@@ -105,7 +110,11 @@ export function ExerciseAdminPanel({
   };
 
   const openEditForm = (exercise: Exercise) => {
-    const existingZones = Array.isArray(exercise.zones) ? exercise.zones.filter(isExerciseZone) : [];
+    const existingZones = Array.isArray(exercise.zones)
+      ? exercise.zones
+          .map((zone) => getExerciseZoneFromPocketBaseValue(zone) ?? (isExerciseZone(zone) ? zone : null))
+          .filter((zone): zone is ExerciseZone => zone !== null)
+      : [];
     setEditingExerciseId(exercise.id);
     setForm({
       title: exercise.title || "",
@@ -161,7 +170,7 @@ export function ExerciseAdminPanel({
 
     return {
       title: form.title.trim(),
-      zones: form.zone,
+      zones: form.zone.map((zone) => zoneConfig[zone].value),
       duration_sec: Math.round(durationSec),
       youtube_id: youtubeId,
       thumb_url: form.thumb_url.trim(),
@@ -287,7 +296,10 @@ export function ExerciseAdminPanel({
               ) : (
                 adminExercises.map((exercise) => {
                   const displayZones = Array.isArray(exercise.zones)
-                    ? exercise.zones.map((zone) => (isExerciseZone(zone) ? zoneConfig[zone].label : zone))
+                    ? exercise.zones.map((zone) => {
+                        const zoneKey = getExerciseZoneFromPocketBaseValue(zone) ?? (isExerciseZone(zone) ? zone : null);
+                        return zoneKey ? zoneConfig[zoneKey].label : zone;
+                      })
                     : [];
 
                   return (
