@@ -15,8 +15,8 @@ export function BottomNav() {
     {
       icon: Timer,
       label: "Session",
-      href: "/timer",
-      isActive: location.pathname === "/timer",
+      href: "/session",
+      isActive: location.pathname === "/session" || location.pathname === "/seance",
       isMain: true, // Bouton principal plus gros
     },
     {

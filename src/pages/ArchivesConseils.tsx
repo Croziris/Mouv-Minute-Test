@@ -84,7 +84,7 @@ export default function ArchivesConseils() {
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: ARTICLES_PER_PAGE }).map((_, index) => (
               <div key={`skeleton-${index}`} className="overflow-hidden rounded-lg border border-border/70 bg-card">
-                <div className="h-40 animate-pulse bg-muted" />
+                <div className="w-full aspect-square animate-pulse bg-muted" />
                 <div className="space-y-3 p-4">
                   <div className="h-5 w-3/4 animate-pulse rounded bg-muted" />
                   <div className="h-4 w-full animate-pulse rounded bg-muted" />

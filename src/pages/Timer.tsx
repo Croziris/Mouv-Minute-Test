@@ -394,7 +394,7 @@ export default function Timer() {
                         <div>
                           <CardTitle className="text-lg font-heading">{exercise.title}</CardTitle>
                           <CardDescription>
-                            Zone : {exercise.zone} • {exercise.duration_sec}s
+                            Zone : {(Array.isArray(exercise.zones) ? exercise.zones.join(", ") : "Autre")} • {exercise.duration_sec}s
                           </CardDescription>
                         </div>
                         {completedExercises.includes(exercise.id) ? (

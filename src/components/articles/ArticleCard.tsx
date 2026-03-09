@@ -15,7 +15,7 @@ export function ArticleCard({ article, className }: ArticleCardProps) {
   return (
     <Link to={`/article/${article.id}`} className={cn("block h-full", className)}>
       <Card className="group flex h-full flex-col overflow-hidden border-border/70 bg-card transition-all duration-300 hover:-translate-y-0.5 hover:shadow-soft">
-        <div className="relative h-40 w-full overflow-hidden bg-gradient-nature">
+        <div className="relative w-full aspect-square overflow-hidden bg-gradient-nature">
           {article.imageUrl ? (
             <img
               src={article.imageUrl}
