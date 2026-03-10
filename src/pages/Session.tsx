@@ -34,11 +34,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { usePWA } from "@/hooks/usePWA";
 import { toast } from "@/hooks/use-toast";
 import {
+  ActiveTimer,
   Exercise,
   WorkoutPlan,
   WorkoutPlanExercise,
   exerciseService,
   sessionService,
+  timerService,
   workoutPlanService,
 } from "@/lib/pocketbase";
 import { buildYouTubeEmbedUrl } from "@/lib/youtube";
@@ -149,6 +151,8 @@ export default function Session() {
   const [timeLeft, setTimeLeft] = useState(duration * 60);
   const [timerState, setTimerState] = useState<TimerState>("stopped");
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [activeTimerId, setActiveTimerId] = useState<string | null>(null);
+  const endAtRef = useRef<number | null>(null);
   const isCompletingRef = useRef(false);
 
   const [plans, setPlans] = useState<WorkoutPlan[]>([]);
@@ -274,6 +278,11 @@ export default function Session() {
   }, []);
 
   const resetTimer = useCallback(() => {
+    if (activeTimerId) {
+      void timerService.cancel(activeTimerId).catch(console.warn);
+      setActiveTimerId(null);
+    }
+    endAtRef.current = null;
     isCompletingRef.current = false;
     setTimerState("stopped");
     setTimeLeft(duration * 60);
@@ -284,7 +293,7 @@ export default function Session() {
     setBreakTab("random");
     setCompletedExercises([]);
     setSessionId(null);
-  }, [duration]);
+  }, [activeTimerId, duration]);
 
   const markExerciseCompleted = useCallback((exerciseId: string) => {
     setCompletedExercises((prev) => (prev.includes(exerciseId) ? prev : [...prev, exerciseId]));
@@ -316,6 +325,11 @@ export default function Session() {
   const handleTimerComplete = useCallback(async () => {
     if (isCompletingRef.current) return;
     isCompletingRef.current = true;
+    if (activeTimerId) {
+      void timerService.stop(activeTimerId).catch(console.warn);
+      setActiveTimerId(null);
+    }
+    endAtRef.current = null;
 
     setIsLoadingBreakExercises(true);
     setIsLoadingBreakPlan(true);
@@ -388,16 +402,27 @@ export default function Session() {
       setIsLoadingBreakPlan(false);
       isCompletingRef.current = false;
     }
-  }, [notificationPermission, notificationsEnabled, showLocalNotification]);
+  }, [activeTimerId, notificationPermission, notificationsEnabled, showLocalNotification]);
 
   const toggleTimer = useCallback(async () => {
     if (timerState === "running") {
       setTimerState("paused");
+      if (activeTimerId && endAtRef.current) {
+        const remainingMs = Math.max(0, endAtRef.current - Date.now());
+        void timerService.pause(activeTimerId, remainingMs).catch(console.warn);
+      }
       return;
     }
 
     if (timerState === "paused") {
       setTimerState("running");
+      if (timeLeft > 0) {
+        const remainingMs = timeLeft * 1000;
+        endAtRef.current = Date.now() + remainingMs;
+        if (activeTimerId) {
+          void timerService.resume(activeTimerId, remainingMs).catch(console.warn);
+        }
+      }
       return;
     }
 
@@ -410,11 +435,19 @@ export default function Session() {
     setCompletedExercises([]);
     setTimeLeft(duration * 60);
     setTimerState("running");
+    const durationMs = duration * 60 * 1000;
+    endAtRef.current = Date.now() + durationMs;
 
     if (user) {
       try {
         const session = await sessionService.start(duration);
         setSessionId(session.id);
+        try {
+          const timer = await timerService.start(durationMs, session.id);
+          setActiveTimerId(timer.id);
+        } catch (timerError) {
+          console.warn("Impossible de sauvegarder le timer dans PocketBase:", timerError);
+        }
       } catch (error) {
         console.error("Error starting session:", error);
         toast({
@@ -424,12 +457,17 @@ export default function Session() {
         });
       }
     }
-  }, [duration, timerState, user]);
+  }, [activeTimerId, duration, timeLeft, timerState, user]);
 
   const completeSession = useCallback(async () => {
     try {
       if (sessionId) {
         await sessionService.end(sessionId);
+      }
+      if (activeTimerId) {
+        void timerService.stop(activeTimerId).catch(console.warn);
+        setActiveTimerId(null);
+        endAtRef.current = null;
       }
       toast({
         title: "Séance validée",
@@ -444,7 +482,7 @@ export default function Session() {
         variant: "destructive",
       });
     }
-  }, [resetTimer, sessionId]);
+  }, [activeTimerId, resetTimer, sessionId]);
 
   useEffect(() => {
     void loadPlans();
@@ -473,16 +511,18 @@ export default function Session() {
   useEffect(() => {
     if (timerState !== "running") return;
 
-    const interval = window.setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          window.clearInterval(interval);
-          void handleTimerComplete();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    const tick = () => {
+      if (!endAtRef.current) return;
+      const remaining = Math.max(0, Math.round((endAtRef.current - Date.now()) / 1000));
+      setTimeLeft(remaining);
+      if (remaining <= 0) {
+        void handleTimerComplete();
+      }
+    };
+
+    tick();
+
+    const interval = window.setInterval(tick, 1000);
 
     return () => window.clearInterval(interval);
   }, [handleTimerComplete, timerState]);
@@ -492,6 +532,39 @@ export default function Session() {
       setTimeLeft(duration * 60);
     }
   }, [duration, timerState]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const restoreTimer = async () => {
+      try {
+        const existing: ActiveTimer | null = await timerService.getActive();
+        if (!existing) return;
+
+        const endAt = new Date(existing.end_at).getTime();
+        const remaining = Math.round((endAt - Date.now()) / 1000);
+
+        if (remaining <= 0) {
+          void timerService.stop(existing.id).catch(console.warn);
+          setActiveTimerId(null);
+          endAtRef.current = null;
+          void handleTimerComplete();
+          return;
+        }
+
+        endAtRef.current = endAt;
+        setTimeLeft(remaining);
+        setActiveTimerId(existing.id);
+        if (existing.session) setSessionId(existing.session);
+        setTimerState("running");
+      } catch (error) {
+        console.warn("Impossible de restaurer le timer:", error);
+      }
+    };
+
+    void restoreTimer();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const availableExercisesForSelectedPlan = useMemo(() => {
     const existingExerciseIds = new Set(adminPlanExercises.map((entry) => entry.exercise));
