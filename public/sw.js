@@ -9,8 +9,7 @@ const STATIC_CACHE_URLS = [
   '/timer',
   '/exercises',
   '/profile',
-  '/icon-192.png',
-  '/icon-512.png',
+  '/Logo.png',
   '/manifest.json'
 ];
 
@@ -119,15 +118,15 @@ self.addEventListener('push', (event) => {
     const title = data.title || "Mouv Minute - Temps de pause !";
     const options = {
       body: data.body || "C'est l'heure de faire quelques exercices !",
-      icon: data.icon || '/icon-192.png',
-      badge: data.badge || '/icon-192.png',
+      icon: data.icon || '/Logo.png',
+      badge: data.badge || '/Logo.png',
       tag: data.tag || 'mouv-minute-notification',
       requireInteraction: data.requireInteraction || true,
       actions: data.actions || [
         { action: 'open', title: 'Voir les exercices' },
         { action: 'dismiss', title: 'Plus tard' }
       ],
-      data: data.data || { url: '/timer' }
+      data: data.data || { url: '/session' }
     };
 
     event.waitUntil(self.registration.showNotification(title, options));
@@ -137,15 +136,15 @@ self.addEventListener('push', (event) => {
     event.waitUntil(
       self.registration.showNotification("Mouv Minute - Temps de pause !", {
         body: "C'est l'heure de faire quelques exercices !",
-        icon: '/icon-192.png',
-        badge: '/icon-192.png',
+        icon: '/Logo.png',
+        badge: '/Logo.png',
         tag: 'mouv-minute-fallback',
         requireInteraction: true,
         actions: [
           { action: 'open', title: "Ouvrir l'app" },
           { action: 'dismiss', title: 'Fermer' }
         ],
-        data: { url: '/timer' }
+        data: { url: '/session' }
       })
     );
   }
@@ -157,7 +156,7 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
   const action = event.action;
-  const url = event.notification.data?.url || '/timer';
+  const url = event.notification.data?.url || '/session';
 
   if (action === 'dismiss') return;
 
