@@ -13,11 +13,10 @@ import { sessionService, Session } from "@/lib/pocketbase";
 import { Link } from "react-router-dom";
 
 interface SessionStats {
-  totalSessions: number;
-  completedSessions: number;
-  totalTimeMinutes: number;
   weekSessions: number;
+  weekCompleted: number;
   monthSessions: number;
+  avgPerWeek: number;
 }
 
 const SETTINGS_KEY = "mouv-minute-profile-settings";
@@ -34,16 +33,15 @@ export default function Profile() {
   const [sessionDuration, setSessionDuration] = useState(45);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [stats, setStats] = useState<SessionStats>({
-    totalSessions: 0,
-    completedSessions: 0,
-    totalTimeMinutes: 0,
     weekSessions: 0,
+    weekCompleted: 0,
     monthSessions: 0,
+    avgPerWeek: 0,
   });
 
   const [profile, setProfile] = useState({
-    display_name: user?.displayName ?? "",
-    email: user?.email ?? "",
+    display_name: "",
+    email: "",
   });
 
   // Restaurer préférences locales
@@ -55,6 +53,22 @@ export default function Profile() {
     setSessionDuration(saved.sessionDuration);
     setNotificationsEnabled(saved.notificationsEnabled);
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      setProfile({
+        display_name: (user as { displayName?: string }).displayName ?? "",
+        email: user.email ?? "",
+      });
+    }
+  }, [user]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify({ sessionDuration, notificationsEnabled }),
+    );
+  }, [sessionDuration, notificationsEnabled]);
 
   // Charger les stats depuis PocketBase
   useEffect(() => {
@@ -69,17 +83,16 @@ export default function Profile() {
         const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-        const completed = sessions.filter((s) => s.completed);
-        const weekSessions = sessions.filter((s) => new Date(s.created) > weekAgo);
-        const monthSessions = sessions.filter((s) => new Date(s.created) > monthAgo);
-        const totalTime = completed.reduce((sum, s) => sum + (s.duration_minute || 0), 0);
+        const weekList = sessions.filter((s) => new Date(s.created) > weekAgo);
+        const monthList = sessions.filter((s) => new Date(s.created) > monthAgo);
+        const weekCompleted = weekList.filter((s) => s.completed).length;
+        const avgPerWeek = Math.round((monthList.length / 4) * 10) / 10;
 
         setStats({
-          totalSessions: sessions.length,
-          completedSessions: completed.length,
-          totalTimeMinutes: totalTime,
-          weekSessions: weekSessions.length,
-          monthSessions: monthSessions.length,
+          weekSessions: weekList.length,
+          weekCompleted,
+          monthSessions: monthList.length,
+          avgPerWeek,
         });
       } catch (err) {
         console.error("Erreur chargement stats:", err);
@@ -109,8 +122,6 @@ export default function Profile() {
       return;
     }
 
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ sessionDuration, notificationsEnabled }));
-
     toast({
       title: "Profil mis à jour ✅",
       description: "Vos informations ont été sauvegardées.",
@@ -118,11 +129,15 @@ export default function Profile() {
     setSaving(false);
   };
 
-  const formatTime = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (hours > 0) return `${hours}h ${mins}min`;
-    return `${mins}min`;
+  const saveSettings = () => {
+    localStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify({ sessionDuration, notificationsEnabled })
+    );
+    toast({
+      title: "Paramètres sauvegardés ✅",
+      description: "Vos préférences ont été mises à jour.",
+    });
   };
 
   if (!user) {
@@ -165,23 +180,7 @@ export default function Profile() {
             </div>
           ) : (
             <>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">
-                      Sessions totales
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-heading font-bold text-primary">
-                      {stats.totalSessions}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {stats.completedSessions} terminées
-                    </p>
-                  </CardContent>
-                </Card>
-
+              <div className="grid gap-4 sm:grid-cols-3">
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -192,7 +191,11 @@ export default function Profile() {
                     <div className="text-2xl font-heading font-bold text-accent">
                       {stats.weekSessions}
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">sessions</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {stats.weekCompleted > 0
+                        ? `dont ${stats.weekCompleted} terminée${stats.weekCompleted > 1 ? "s" : ""}`
+                        : "aucune terminée"}
+                    </p>
                   </CardContent>
                 </Card>
 
@@ -213,19 +216,19 @@ export default function Profile() {
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-muted-foreground">
-                      Temps total
+                      Moyenne / semaine
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-heading font-bold text-accent">
-                      {formatTime(stats.totalTimeMinutes)}
+                      {stats.avgPerWeek}
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">d'activité</p>
+                    <p className="text-xs text-muted-foreground mt-1">sur le dernier mois</p>
                   </CardContent>
                 </Card>
               </div>
 
-              {stats.completedSessions > 0 && (
+              {stats.weekCompleted > 0 && (
                 <Card className="bg-gradient-primary border-0 text-primary-foreground">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-3">
@@ -233,8 +236,8 @@ export default function Profile() {
                       <div>
                         <p className="font-medium">Félicitations 🎉</p>
                         <p className="text-sm opacity-90">
-                          Vous avez terminé {stats.completedSessions} session
-                          {stats.completedSessions > 1 ? "s" : ""}. Continuez comme ça !
+                          Vous avez terminé {stats.weekCompleted} session
+                          {stats.weekCompleted > 1 ? "s" : ""}. Continuez comme ça !
                         </p>
                       </div>
                     </div>
@@ -279,9 +282,11 @@ export default function Profile() {
               {/* Badge rôle et abonnement */}
               <div className="flex gap-2 text-xs">
                 <span className="px-2 py-1 rounded-full bg-primary/10 text-primary font-medium">
+                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                   {(user as any).role || "user"}
                 </span>
                 <span className="px-2 py-1 rounded-full bg-accent/10 text-accent font-medium">
+                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                   {(user as any).subscription_status || "free"}
                 </span>
               </div>
@@ -334,6 +339,13 @@ export default function Profile() {
                   checked={notificationsEnabled}
                   onCheckedChange={setNotificationsEnabled}
                 />
+              </div>
+
+              <Separator />
+              <div className="flex justify-end pt-2">
+                <Button onClick={saveSettings}>
+                  Sauvegarder les paramètres
+                </Button>
               </div>
             </CardContent>
           </Card>

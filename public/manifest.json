@@ -29,7 +29,7 @@
       "name": "Démarrer une session",
       "short_name": "Session",
       "description": "Lancer une session de travail avec rappels d'exercices",
-      "url": "/timer",
+      "url": "/session",
       "icons": [{ "src": "/Logo.png", "sizes": "192x192" }]
     },
     {

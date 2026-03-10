@@ -299,11 +299,18 @@ export const sessionService = {
 
   // Historique des sessions de l'utilisateur
   async getHistory() {
-    const userId = pb.authStore.model?.id
+    const userId = pb.authStore.record?.id ?? pb.authStore.model?.id
     if (!userId) throw new Error('Non connecté')
-    return await pb.collection('sessions').getFullList<Session>({
-      filter: `user = "${userId}"`,
+
+    const since = new Date(Date.now() - 35 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .replace('T', ' ')
+      .slice(0, 19)
+
+    return await pb.collection('sessions').getList<Session>(1, 500, {
+      filter: `user = "${userId}" && created >= "${since}"`,
       sort: '-created',
+      requestKey: null,
     })
   },
 }
