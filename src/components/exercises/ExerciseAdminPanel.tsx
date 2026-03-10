@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -250,31 +251,32 @@ export function ExerciseAdminPanel({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl">
-        <DialogHeader>
+      <DialogContent className="w-full max-w-3xl mx-2 sm:mx-auto flex flex-col max-h-[90vh]">
+        <DialogHeader className="shrink-0">
           <DialogTitle>Panel admin - Exercices</DialogTitle>
           <DialogDescription>
             Ajouter, modifier ou supprimer des exercices. Les changements sont enregistres dans PocketBase.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex gap-2">
-          <Button variant={adminTab === "list" ? "default" : "outline"} onClick={() => setAdminTab("list")}>
-            Liste
-          </Button>
-          <Button
-            variant={adminTab === "form" ? "default" : "outline"}
-            onClick={() => {
-              if (!editingExerciseId) setForm(createEmptyForm());
-              setAdminTab("form");
-            }}
-          >
-            {editingExerciseId ? "Edition" : "Ajout"}
-          </Button>
-        </div>
+        <Tabs
+          value={adminTab}
+          onValueChange={(value) => {
+            if (value === "form" && !editingExerciseId) {
+              setForm(createEmptyForm());
+            }
+            if (value === "list" || value === "form") {
+              setAdminTab(value);
+            }
+          }}
+          className="flex flex-col flex-1 min-h-0 space-y-4"
+        >
+          <TabsList className="shrink-0 grid w-full grid-cols-2">
+            <TabsTrigger value="list">Liste</TabsTrigger>
+            <TabsTrigger value="form">{editingExerciseId ? "Edition" : "Ajout"}</TabsTrigger>
+          </TabsList>
 
-        {adminTab === "list" ? (
-          <div className="space-y-3">
+          <TabsContent value="list" className="flex-1 overflow-y-auto overflow-x-hidden pr-1 space-y-4">
             <div className="flex justify-end">
               <Button onClick={openCreateForm}>
                 <Plus className="mr-2 h-4 w-4" />
@@ -282,19 +284,19 @@ export function ExerciseAdminPanel({
               </Button>
             </div>
 
-            <div className="max-h-[50vh] overflow-auto space-y-2 pr-1">
-              {adminLoading ? (
-                <div className="flex justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                </div>
-              ) : adminExercises.length === 0 ? (
-                <Card>
-                  <CardContent className="p-6 text-center text-sm text-muted-foreground">
-                    Aucun exercice trouve.
-                  </CardContent>
-                </Card>
-              ) : (
-                adminExercises.map((exercise) => {
+            {adminLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : adminExercises.length === 0 ? (
+              <Card>
+                <CardContent className="p-6 text-center text-sm text-muted-foreground">
+                  Aucun exercice trouve.
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-2">
+                {adminExercises.map((exercise) => {
                   const displayZones = Array.isArray(exercise.zones)
                     ? exercise.zones.map((zone) => {
                         const zoneKey = getExerciseZoneFromPocketBaseValue(zone) ?? (isExerciseZone(zone) ? zone : null);
@@ -303,50 +305,49 @@ export function ExerciseAdminPanel({
                     : [];
 
                   return (
-                    <Card key={exercise.id}>
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="space-y-1">
-                            <p className="font-medium">{exercise.title}</p>
-                            <p className="text-xs text-muted-foreground">
-                              Zone{displayZones.length > 1 ? "s" : ""}: {displayZones.join(", ") || "Non renseignee"} -
-                              Duree: {exercise.duration_sec}s
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Lien YouTube: {buildYouTubeWatchUrl(exercise.youtube_id) || "non renseigne"}
-                            </p>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button variant="outline" size="sm" onClick={() => openEditForm(exercise)}>
-                              <Pencil className="h-4 w-4 mr-1" />
-                              Editer
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => void deleteExercise(exercise)}
-                              disabled={deletingId === exercise.id}
-                            >
-                              {deletingId === exercise.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <>
-                                  <Trash2 className="h-4 w-4 mr-1" />
-                                  Supprimer
-                                </>
-                              )}
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
+                    <div
+                      key={exercise.id}
+                      className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-md border border-border/70 p-3"
+                    >
+                      <div className="min-w-0 space-y-1">
+                        <p className="text-sm font-medium truncate max-w-[200px] sm:max-w-none">{exercise.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Zone{displayZones.length > 1 ? "s" : ""}: {displayZones.join(", ") || "Non renseignee"} -
+                          Duree: {exercise.duration_sec}s
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate max-w-[200px] sm:max-w-none">
+                          Lien YouTube: {buildYouTubeWatchUrl(exercise.youtube_id) || "non renseigne"}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button variant="outline" size="sm" onClick={() => openEditForm(exercise)}>
+                          <Pencil className="h-4 w-4 mr-1" />
+                          Editer
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => void deleteExercise(exercise)}
+                          disabled={deletingId === exercise.id}
+                        >
+                          {deletingId === exercise.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <>
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              Supprimer
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
                   );
-                })
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
+                })}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="form" className="flex-1 overflow-y-auto overflow-x-hidden pr-1 space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="admin-title">Titre</Label>
@@ -469,8 +470,8 @@ export function ExerciseAdminPanel({
                 )}
               </Button>
             </div>
-          </div>
-        )}
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

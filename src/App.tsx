@@ -3,10 +3,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Home from "./pages/Home";
-import Timer from "./pages/Timer";
 import Exercises from "./pages/Exercises";
 import ExerciseDetail from "./pages/ExerciseDetail";
 import ArticleDetail from "./pages/ArticleDetail";
@@ -28,7 +27,7 @@ const App = () => {
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Home />} />
-              <Route path="/timer" element={<Timer />} />
+              <Route path="/timer" element={<Navigate to="/session" replace />} />
               <Route path="/session" element={<Session />} />
               <Route path="/session/plans/:planId" element={<WorkoutPlanDetail />} />
               <Route path="/exercises" element={<Exercises />} />

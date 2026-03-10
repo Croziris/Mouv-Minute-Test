@@ -174,7 +174,7 @@ export default function ExerciseDetail() {
           {/* Actions */}
           <div className="flex gap-4 justify-center">
             <Button
-              onClick={() => navigate("/timer")}
+              onClick={() => navigate("/session")}
               className="bg-accent hover:bg-accent-light text-accent-foreground"
               size="lg"
             >
