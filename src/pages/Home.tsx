@@ -230,7 +230,7 @@ export default function Home() {
             <p className="text-muted-foreground">
               Lancez un timer de 45 minutes et recevez des rappels pour vos pauses bien-etre
             </p>
-            <Link to="/timer">
+            <Link to="/session">
               <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary-dark">
                 Demarrer maintenant
                 <ArrowRight className="ml-2 h-5 w-5" />

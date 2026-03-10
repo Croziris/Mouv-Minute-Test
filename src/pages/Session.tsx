@@ -134,7 +134,18 @@ export default function Session() {
     showLocalNotification,
   } = usePWA();
 
-  const [duration, setDuration] = useState(45);
+  const [duration, setDuration] = useState<number>(() => {
+    try {
+      const raw = localStorage.getItem("mouv-minute-profile-settings");
+      if (!raw) return 45;
+      const parsed = JSON.parse(raw) as { sessionDuration?: number };
+      const value = parsed.sessionDuration;
+      if (typeof value === "number" && [30, 45, 60].includes(value)) return value;
+    } catch {
+      // Ignore invalid localStorage payload
+    }
+    return 45;
+  });
   const [timeLeft, setTimeLeft] = useState(duration * 60);
   const [timerState, setTimerState] = useState<TimerState>("stopped");
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -142,6 +153,7 @@ export default function Session() {
 
   const [plans, setPlans] = useState<WorkoutPlan[]>([]);
   const [isLoadingPlans, setIsLoadingPlans] = useState(true);
+  const [planExerciseCounts, setPlanExerciseCounts] = useState<Record<string, number>>({});
 
   const [breakExercises, setBreakExercises] = useState<Exercise[]>([]);
   const [isLoadingBreakExercises, setIsLoadingBreakExercises] = useState(false);
@@ -176,6 +188,30 @@ export default function Session() {
       const data = await workoutPlanService.getAll();
       const sorted = sortPlans(data);
       setPlans(sorted);
+
+      if (sorted.length === 0) {
+        setPlanExerciseCounts({});
+      } else {
+        try {
+          const countEntries = await Promise.all(
+            sorted.map(async (plan) => {
+              const count = await workoutPlanService.getExerciseCount(plan.id);
+              return [plan.id, count] as [string, number];
+            }),
+          );
+          setPlanExerciseCounts(Object.fromEntries(countEntries));
+        } catch (error) {
+          console.error("Error loading workout plan exercise counts:", error);
+          setPlanExerciseCounts(
+            Object.fromEntries(sorted.map((plan) => [plan.id, 0] as [string, number])),
+          );
+          toast({
+            title: "Erreur",
+            description: "Impossible de charger le nombre d'exercices des seances.",
+            variant: "destructive",
+          });
+        }
+      }
 
       setSelectedAdminPlanId((prev) => {
         if (sorted.length === 0) return "";
@@ -966,7 +1002,24 @@ export default function Session() {
                               <div className="space-y-1">
                                 <p className="font-medium text-primary">{plan.title}</p>
                                 <p className="text-sm text-muted-foreground">{plan.description || "Aucune description."}</p>
-                                <p className="text-xs text-muted-foreground">3-5 exercices - ~5 min</p>
+                                {(() => {
+                                  const count = planExerciseCounts[plan.id];
+                                  if (count === undefined) {
+                                    return (
+                                      <p className="text-xs text-muted-foreground animate-pulse">
+                                        Chargement...
+                                      </p>
+                                    );
+                                  }
+                                  const estimatedMin = Math.max(1, Math.round((count * 45) / 60));
+                                  return (
+                                    <p className="text-xs text-muted-foreground">
+                                      {count > 0
+                                        ? `${count} exercice${count > 1 ? "s" : ""} • ~${estimatedMin} min`
+                                        : "Aucun exercice"}
+                                    </p>
+                                  );
+                                })()}
                               </div>
                               <ChevronDown className="h-5 w-5 text-muted-foreground" />
                             </div>

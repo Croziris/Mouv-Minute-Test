@@ -240,6 +240,15 @@ export const workoutPlanService = {
     })
   },
 
+  // Recuperer le nombre d'exercices d'un plan
+  async getExerciseCount(planId: string): Promise<number> {
+    const result = await pb.collection('workout_plan_exercises').getList(1, 1, {
+      filter: `plan = "${planId}"`,
+      requestKey: null,
+    })
+    return result.totalItems
+  },
+
   // Ajouter un exercice au plan
   async addExercise(planId: string, exerciseId: string, orderIndex: number) {
     return await pb.collection('workout_plan_exercises').create<WorkoutPlanExercise>({
