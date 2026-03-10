@@ -422,6 +422,18 @@ export default function Session() {
         if (activeTimerId) {
           void timerService.resume(activeTimerId, remainingMs).catch(console.warn);
         }
+        const webhookUrl = import.meta.env.VITE_N8N_TIMER_WEBHOOK;
+        if (webhookUrl && activeTimerId && user && endAtRef.current) {
+          void fetch(webhookUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              timerId: activeTimerId,
+              userId: user.id,
+              endAt: new Date(endAtRef.current).toISOString(),
+            }),
+          }).catch(console.warn);
+        }
       }
       return;
     }
@@ -445,6 +457,18 @@ export default function Session() {
         try {
           const timer = await timerService.start(durationMs, session.id);
           setActiveTimerId(timer.id);
+          const webhookUrl = import.meta.env.VITE_N8N_TIMER_WEBHOOK;
+          if (webhookUrl && timer && user) {
+            void fetch(webhookUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                timerId: timer.id,
+                userId: user.id,
+                endAt: new Date(Date.now() + durationMs).toISOString(),
+              }),
+            }).catch(console.warn);
+          }
         } catch (timerError) {
           console.warn("Impossible de sauvegarder le timer dans PocketBase:", timerError);
         }
