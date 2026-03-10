@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Layout } from "@/components/layout/Layout";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePWA } from "@/hooks/usePWA";
 import { toast } from "@/hooks/use-toast";
 import { sessionService, Session } from "@/lib/pocketbase";
 import { Link } from "react-router-dom";
@@ -28,6 +29,11 @@ const safeParse = <T,>(value: string | null, fallback: T): T => {
 
 export default function Profile() {
   const { user, signOut, updateProfile } = useAuth();
+  const {
+    notificationPermission,
+    requestNotificationPermission,
+    subscribeToNotifications,
+  } = usePWA();
   const [saving, setSaving] = useState(false);
   const [loadingStats, setLoadingStats] = useState(true);
   const [sessionDuration, setSessionDuration] = useState(45);
@@ -337,7 +343,16 @@ export default function Profile() {
                 </div>
                 <Switch
                   checked={notificationsEnabled}
-                  onCheckedChange={setNotificationsEnabled}
+                  onCheckedChange={async (enabled) => {
+                    setNotificationsEnabled(enabled);
+                    if (enabled) {
+                      if (notificationPermission !== "granted") {
+                        await requestNotificationPermission();
+                      } else {
+                        await subscribeToNotifications();
+                      }
+                    }
+                  }}
                 />
               </div>
 
