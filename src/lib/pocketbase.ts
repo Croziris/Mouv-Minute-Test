@@ -355,6 +355,13 @@ export const timerService = {
     })
   },
 
+  // Annuler un timer actif
+  async cancel(timerId: string) {
+    return await pb.collection('active_timers').update<ActiveTimer>(timerId, {
+      is_active: false,
+    })
+  },
+
   // Mettre en pause
   async pause(timerId: string, remainingMs: number) {
     return await pb.collection('active_timers').update<ActiveTimer>(timerId, {
